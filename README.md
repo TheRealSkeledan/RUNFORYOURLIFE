@@ -1,2 +1,3 @@
-# Project-Economics
-Game for CS project
+# Project: Economics
+
+A Tycoon game that simultes real world Economics
