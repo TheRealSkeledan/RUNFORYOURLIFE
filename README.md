@@ -4,7 +4,7 @@
 
 ## 📝 Description
 
-Project-Economics is an immersive simulation game developed as a Computer Science project, designed to explore the intricate dynamics of economic systems. Through engaging gameplay, users can navigate market fluctuations, manage scarce resources, and apply strategic decision-making to master various economic scenarios. This project bridges the gap baetween theoretical economic concepts and interactive software development, providing a practical platform for learning and experimentation.
+Project: Economics is a simulation of real world economics through a tycoon
 
 ## 📸 Screenshots
 
