@@ -6,6 +6,7 @@ import App.Main;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
+import java.util.Objects;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
@@ -24,7 +25,7 @@ public class MainMenuPanel extends JPanel {
         JButton startButton = new JButton();
         startButton.addActionListener(e -> mainFrame.showCharacterSelect());
 
-        Image img = ImageIO.read(getClass().getResource("/assets/images/ui/testButton.png"));
+        Image img = ImageIO.read(getClass().getResource("/images/ui/testButton.png"));
         startButton.setIcon(new ImageIcon(img));
 
         gbc.gridy = 0;

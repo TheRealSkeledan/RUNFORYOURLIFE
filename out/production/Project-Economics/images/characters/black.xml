@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spritesheet>
+    <character name="black" spriteWidth="441" spriteHeight="306">
+        <animations>
+
+            <animation name="idle">
+                <frame x="0" y="0"/>
+                <frame x="441" y="0"/>
+                <frame x="882" y="0"/>
+                <frame x="1323" y="0"/>
+            </animation>
+
+            <animation name="walk">
+                <frame x="443" y="306"/>
+                <frame x="0" y="306"/>
+                <frame x="441" y="306"/>
+                <frame x="882" y="306"/>
+            </animation>
+            
+            <animation name="jump">
+                <frame x="1323" y="306"/>
+            </animation>
+
+            <animation name="light">
+                <frame x="0" y="612"/>
+            </animation>
+
+            <animation name="heavy">
+                <frame x="441" y="612"/>
+                <frame x="882" y="612"/>
+                <frame x="1323" y="612"/>
+                <frame x="0" y="918"/>
+                <frame x="441" y="918"/>
+                <frame x="882" y="918"/>
+                <frame x="1323" y="918"/>
+            </animation>
+
+            <animation name="special">
+                <frame x="0" y="1224"/>
+                <frame x="441" y="1224"/>
+                <frame x="882" y="1224"/>
+                <frame x="1323" y="1224"/>
+            </animation>
+
+            <animation name="final">
+                <frame x="0" y="1530"/>
+                <frame x="441" y="1530"/>
+            </animation>
+
+            <animation name="taunt">
+                <frame x="882" y="1530"/>
+            </animation>
+
+        </animations>
+    </character>
+</spritesheet>

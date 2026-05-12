@@ -21,8 +21,8 @@ public class CharacterSelectPanel extends JPanel {
         this.mainFrame = mainFrame;
         setLayout(null);
 
-        bgIcon = new ImageIcon(getClass().getResource("/assets/images/backgrounds/Menu/barThing.png"));
-        menuBG = new ImageIcon(getClass().getResource("/assets/images/backgrounds/Menu/menuBG.png"));
+        bgIcon = new ImageIcon(getClass().getResource("/images/backgrounds/Menu/barThing.png"));
+        menuBG = new ImageIcon(getClass().getResource("/images/backgrounds/Menu/menuBG.png"));
 
         portraitLabel = new JLabel();
         portraitLabel.setBounds(800, 200, 400, 400);
@@ -92,7 +92,7 @@ public class CharacterSelectPanel extends JPanel {
     private void updateCharacterDisplay() {
         String characterName = characterNames[currentIndex];
         try {
-            String portraitPath = "/assets/images/characters/" + characterName.toLowerCase() + "Portrait.png";
+            String portraitPath = "/images/characters/" + characterName.toLowerCase() + "Portrait.png";
             ImageIcon originalPortraitIcon = new ImageIcon(getClass().getResource(portraitPath));
     
             if (originalPortraitIcon.getIconWidth() == -1 || originalPortraitIcon.getIconHeight() == -1) {
@@ -116,7 +116,7 @@ public class CharacterSelectPanel extends JPanel {
             int startY = 200;
             portraitLabel.setBounds(startX, startY, displayWidth, displayHeight);
     
-            String iconPath = "/assets/images/characters/" + characterName.toLowerCase() + "Icon.png";
+            String iconPath = "/images/characters/" + characterName.toLowerCase() + "Icon.png";
             ImageIcon smallIcon = new ImageIcon(getClass().getResource(iconPath));
             iconLabel.setIcon(smallIcon);
     
