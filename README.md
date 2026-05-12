@@ -10,7 +10,6 @@ Project: Economics is a simulation of real world economics through a tycoon
 
 ## 👥 Credits
 
-Created by Skeledan, Circuit Fan, and ShreyDaBest
-Uses IntelliJ as the IDE
-
-[Implements Skeletal Games Engine](https://github.com/TheRealSkeledan/SkeletalGamesEngineJAVA)
+- Created by Skeledan, Circuit Fan, and ShreyDaBest
+- Uses IntelliJ as the IDE
+- [Implements Skeletal Games Engine](https://github.com/TheRealSkeledan/SkeletalGamesEngineJAVA)
