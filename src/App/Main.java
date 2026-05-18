@@ -11,7 +11,7 @@ public final class Main extends JFrame {
     private static final int SCREEN_HEIGHT = 720;
 
     public Main() throws IOException {
-        setTitle("VS IMPOSTER Fighting Game thing");
+        setTitle("Project: Economics");
         setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);

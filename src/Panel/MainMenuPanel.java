@@ -25,11 +25,24 @@ public class MainMenuPanel extends JPanel {
         JButton startButton = new JButton();
         startButton.addActionListener(e -> mainFrame.showCharacterSelect());
 
-        Image img = ImageIO.read(getClass().getResource("/images/ui/testButton.png"));
-        startButton.setIcon(new ImageIcon(img));
+        JButton achievementsButton = new JButton();
+        achievementsButton.addActionListener(e -> mainFrame.showCharacterSelect());
 
-        gbc.gridy = 0;
+        JButton creditsButton = new JButton();
+        creditsButton.addActionListener(e -> mainFrame.showCharacterSelect());
+
+        Image img1 = ImageIO.read(getClass().getResource("/images/ui/PlayButton.png"));
+        Image img2 = ImageIO.read(getClass().getResource("/images/ui/AchievementsButton.png"));
+        Image img3 = ImageIO.read(getClass().getResource("/images/ui/CreditsButton.png"));
+
+        startButton.setIcon(new ImageIcon(img1));
+        achievementsButton.setIcon(new ImageIcon(img2));
+        creditsButton.setIcon(new ImageIcon(img3));
+
+        gbc.gridx = 0;
         add(startButton, gbc);
+        add(achievementsButton, gbc);
+        add(creditsButton, gbc);
 
         this.addComponentListener(new ComponentAdapter() {
             @Override
