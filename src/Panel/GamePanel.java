@@ -1,5 +1,3 @@
-// GamePanel.java
-
 package Panel;
 
 import Engine.Map;
@@ -30,6 +28,9 @@ public class GamePanel extends JPanel {
     private int renderXOffset = 0;
     private int renderYOffset = 0;
 
+    // Single instance — created once, not every frame
+    private final MoneyClicker moneyClicker;
+
     public GamePanel() throws IOException {
         Map.setName("polus");
 
@@ -38,6 +39,11 @@ public class GamePanel extends JPanel {
 
         addKeyListener(new Keyboard());
         setDoubleBuffered(true);
+
+        // Create clicker once and register click listener on this panel
+        MoneyClicker.createClicker();
+        moneyClicker = new MoneyClicker("gold");
+        moneyClicker.registerClickListener(this);
 
         executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.scheduleAtFixedRate(this::gameLoop, 0, OPTIMAL_TIME, TimeUnit.NANOSECONDS);
@@ -92,14 +98,13 @@ public class GamePanel extends JPanel {
         g2d.scale((double) renderWidth / SCREEN_WIDTH, (double) renderHeight / SCREEN_HEIGHT);
 
         Map.drawBackStage(g2d, 0, 0);
-
         Map.drawFrontStage(g2d, 0, 0);
 
         g2d.setColor(Color.RED);
         g2d.drawString("FPS: " + fps, 10, 10);
 
-        MoneyClicker.createClicker();
-        MoneyClicker.drawMoneyClicker(g2d);
+        moneyClicker.drawAnimatedClicker(g2d);
+        moneyClicker.drawMoneyDisplay(g2d);  // <-- money counter
 
         g2d.dispose();
         g.dispose();
