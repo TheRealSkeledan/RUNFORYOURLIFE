@@ -5,6 +5,7 @@ package Panel;
 import Abstract.Character;
 import Engine.Map;
 import Engine.UI;
+import Engine.MoneyClicker;
 
 import java.awt.*;
 import java.awt.event.*;
@@ -110,7 +111,7 @@ public class GamePanel extends JPanel {
             g2d.drawImage(p1.getCurrentFrame(), p1.getX(), p1.getY(), this);
         } else {
             g2d.drawImage(p1.getCurrentFrame(), p1.getX() + p1.getWidth(), p1.getY(),
-                          -p1.getWidth(), p1.getHeight(), this);
+                    -p1.getWidth(), p1.getHeight(), this);
         }
 
         Map.drawFrontStage(g2d, 0, 0);
@@ -118,6 +119,9 @@ public class GamePanel extends JPanel {
 
         g2d.setColor(Color.RED);
         g2d.drawString("FPS: " + fps, 10, 10);
+
+        MoneyClicker.createClicker();
+        MoneyClicker.drawMoneyClicker(g2d);
 
         g2d.dispose();
         p1.drawProjectiles(g);
