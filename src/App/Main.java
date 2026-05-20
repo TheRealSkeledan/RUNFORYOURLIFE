@@ -14,7 +14,7 @@ public final class Main extends JFrame {
         setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        
+
         try {
             Music menuMusic = new Music("assets/music/mainMenu");
             menuMusic.play();
@@ -31,21 +31,23 @@ public final class Main extends JFrame {
         revalidate();
     }
 
-    public void showCharacterSelect() {
-        setContentPane(new CharacterSelectPanel(this));
-        revalidate();
+    public void showGame() {
+        try {
+            GamePanel gamePanel = new GamePanel();
+            setContentPane(gamePanel);
+            revalidate();
+            gamePanel.requestFocusInWindow();
+            gamePanel.repaint();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public void startGame() throws IOException {
-        GamePanel gamePanel = new GamePanel();
-        setContentPane(gamePanel);
-        revalidate();
-
-        gamePanel.requestFocusInWindow();
-        gamePanel.repaint();
+        showGame();
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             try {
                 new Main();

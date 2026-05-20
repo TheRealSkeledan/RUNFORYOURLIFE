@@ -3,7 +3,6 @@
 package Panel;
 
 import Engine.Map;
-import Engine.UI;
 import Engine.MoneyClicker;
 
 import java.awt.*;
@@ -33,7 +32,6 @@ public class GamePanel extends JPanel {
 
     public GamePanel() throws IOException {
         Map.setName("polus");
-        UI.create();
 
         setFocusable(true);
         requestFocusInWindow();
