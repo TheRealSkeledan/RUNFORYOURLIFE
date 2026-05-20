@@ -2,7 +2,6 @@
 
 package Panel;
 
-import Abstract.Character;
 import Engine.Map;
 import Engine.UI;
 import Engine.MoneyClicker;
@@ -14,7 +13,6 @@ import java.util.concurrent.*;
 import javax.swing.*;
 
 public class GamePanel extends JPanel {
-    private final Character p1;
     private final boolean[] keys = new boolean[16];
     private boolean p1isFacingRight = true;
 
@@ -33,9 +31,7 @@ public class GamePanel extends JPanel {
     private int renderXOffset = 0;
     private int renderYOffset = 0;
 
-    public GamePanel(Character playerCharacter) throws IOException {
-        this.p1 = playerCharacter;
-
+    public GamePanel() throws IOException {
         Map.setName("polus");
         UI.create();
 
@@ -75,22 +71,14 @@ public class GamePanel extends JPanel {
     }
 
     private void gameLoop() {
-        try {
-            moveP1();
-            p1.updatePosition();
-            p1.updateAnimationFrame();
-            p1.updateProjectiles();
-            repaint();
+        repaint();
 
-            long now = System.nanoTime();
-            frameCount++;
-            if (now - lastTime >= 1000000000) {
-                fps = frameCount;
-                frameCount = 0;
-                lastTime = now;
-            }
-        } catch (IOException e) {
-            System.out.println(e);
+        long now = System.nanoTime();
+        frameCount++;
+        if (now - lastTime >= 1000000000) {
+            fps = frameCount;
+            frameCount = 0;
+            lastTime = now;
         }
     }
 
@@ -107,15 +95,7 @@ public class GamePanel extends JPanel {
 
         Map.drawBackStage(g2d, 0, 0);
 
-        if (p1isFacingRight) {
-            g2d.drawImage(p1.getCurrentFrame(), p1.getX(), p1.getY(), this);
-        } else {
-            g2d.drawImage(p1.getCurrentFrame(), p1.getX() + p1.getWidth(), p1.getY(),
-                    -p1.getWidth(), p1.getHeight(), this);
-        }
-
         Map.drawFrontStage(g2d, 0, 0);
-        UI.drawUI(p1.getHP(), p1.getKP(), true, g2d, p1.name);
 
         g2d.setColor(Color.RED);
         g2d.drawString("FPS: " + fps, 10, 10);
@@ -124,7 +104,6 @@ public class GamePanel extends JPanel {
         MoneyClicker.drawMoneyClicker(g2d);
 
         g2d.dispose();
-        p1.drawProjectiles(g);
         g.dispose();
     }
 
@@ -156,26 +135,6 @@ public class GamePanel extends JPanel {
                 case 'q' -> keys[6] = false;
                 case 'r' -> keys[7] = false;
             }
-        }
-    }
-
-    private void moveP1() throws IOException {
-        if (keys[0]) p1.jump();
-        if (!keys[2]) {
-            if (keys[1]) p1.move(-p1.speed);
-            if (keys[3]) p1.move(p1.speed);
-        }
-        if (keys[2]) p1.defend();
-        if (keys[4]) p1.light();
-        if (keys[5]) p1.heavy();
-        if (keys[6]) p1.taunt();
-        if (keys[7]) p1.finish();
-        resetAnimP1();
-    }
-
-    private void resetAnimP1() {
-        if (!keys[1] && !keys[2] && !keys[3] && !keys[4] && !keys[5] && !keys[6] && !keys[7] && !p1.jumping && !p1.isLocked) {
-            p1.setAction("idle");
         }
     }
 }

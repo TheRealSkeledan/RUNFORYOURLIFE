@@ -1,8 +1,6 @@
 package Panel;
 
-import Abstract.Character;
 import App.Main;
-import Characters.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
@@ -74,7 +72,11 @@ public class CharacterSelectPanel extends JPanel {
         actionMap.put("confirmSelection", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                confirmSelection();
+                try {
+                    confirmSelection();
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
             }
         });
     }
@@ -150,19 +152,8 @@ public class CharacterSelectPanel extends JPanel {
         }
     }           
 
-    private void confirmSelection() {
-        try {
-            String selectedCharacterName = characterNames[currentIndex];
-            Character selected = switch (selectedCharacterName) {
-                case "Red" -> new Red(40, 300);
-                case "Green" -> new Green(40, 300);
-                case "Black" -> new Black(40, 300);
-                default -> throw new IllegalStateException("Unexpected character: " + selectedCharacterName);
-            };
-            mainFrame.startGame(selected);
-        } catch (IOException e) {
-            System.out.println(e);
-        }
+    private void confirmSelection() throws IOException {
+        mainFrame.startGame();
     }
 
     @Override

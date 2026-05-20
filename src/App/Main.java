@@ -1,6 +1,5 @@
 package App;
 
-import Abstract.Character;
 import Engine.Music;
 import Panel.*;
 import java.io.IOException;
@@ -37,8 +36,8 @@ public final class Main extends JFrame {
         revalidate();
     }
 
-    public void startGame(Character playerCharacter) throws IOException {
-        GamePanel gamePanel = new GamePanel(playerCharacter);
+    public void startGame() throws IOException {
+        GamePanel gamePanel = new GamePanel();
         setContentPane(gamePanel);
         revalidate();
 
