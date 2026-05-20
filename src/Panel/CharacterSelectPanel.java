@@ -113,7 +113,7 @@ public class CharacterSelectPanel extends JPanel {
             Image scaledPortrait = originalPortraitIcon.getImage().getScaledInstance(displayWidth, displayHeight, Image.SCALE_SMOOTH);
             ImageIcon portraitIcon = new ImageIcon(scaledPortrait);
             portraitLabel.setIcon(portraitIcon);
-    
+        System.out.println("MICHAEL IS THE GOAT");
             int startX = 700; 
             int startY = 200;
             portraitLabel.setBounds(startX, startY, displayWidth, displayHeight);
