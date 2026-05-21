@@ -32,7 +32,7 @@ public class GamePanel extends JPanel {
     private final MoneyClicker moneyClicker;
 
     public GamePanel() throws IOException {
-        Map.setName("polus");
+        Map.setName("Default");
 
         setFocusable(true);
         requestFocusInWindow();
@@ -98,7 +98,6 @@ public class GamePanel extends JPanel {
         g2d.scale((double) renderWidth / SCREEN_WIDTH, (double) renderHeight / SCREEN_HEIGHT);
 
         Map.drawBackStage(g2d, 0, 0);
-        Map.drawFrontStage(g2d, 0, 0);
 
         g2d.setColor(Color.RED);
         g2d.drawString("FPS: " + fps, 10, 10);

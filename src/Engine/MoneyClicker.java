@@ -17,26 +17,25 @@ public class MoneyClicker {
     private static BufferedImage moneyClicker;
 
     private static final Rectangle CLICKER_BOUNDS = new Rectangle(490, 210, 300, 300);
-    private static final int FRAME_DURATION = 5; // frames per animation frame
+    private static final int FRAME_DURATION = 5;
 
     String level;
     private int money = 0;
 
     // Animation state
     private Map<String, BufferedImage[]> animations;
-    private boolean isAnimating = false;
+    private String currentAnimation = "idle"; // track which animation is active
     private int currentFrame = 0;
     private int frameTick = 0;
 
     public MoneyClicker(String color) {
         level = color;
-        // Name must match your XML character name and filename in assets/images/characters/
-        animations = AnimationLoader.loadAnimations("MoneyButton");
+        animations = AnimationLoader.loadAnimations("MoneyIcon");
     }
 
     public static void createClicker() {
         try {
-            moneyClicker = ImageIO.read(new File("assets/images/ui/MoneyButton.png"));
+            moneyClicker = ImageIO.read(new File("assets/images/characters/MoneyIcon.png"));
         } catch (IOException e) {
             System.out.println("Failed to load Money image");
         }
@@ -48,29 +47,51 @@ public class MoneyClicker {
 
     // Call this every frame from paintComponent instead of drawMoneyClicker
     public void drawAnimatedClicker(Graphics g) {
-        BufferedImage[] clickFrames = animations.get("click");
+        BufferedImage[] frames = animations.get(currentAnimation);
 
-        // If animation is playing and frames exist, draw the animation
-        if (isAnimating && clickFrames != null && clickFrames.length > 0) {
-            frameTick++;
-            if (frameTick >= FRAME_DURATION) {
-                frameTick = 0;
-                currentFrame++;
-                if (currentFrame >= clickFrames.length) {
-                    // Animation finished — reset back to idle
+        // Fallback to idle if current animation isn't found
+        if (frames == null || frames.length == 0) {
+            frames = animations.get("idle");
+        }
+
+        // Fallback to static image if no idle animation either
+        if (frames == null || frames.length == 0) {
+            g.drawImage(moneyClicker, 490, 210, 300, 300, null);
+            return;
+        }
+
+        // Advance the frame ticker
+        frameTick++;
+        if (frameTick >= FRAME_DURATION) {
+            frameTick = 0;
+            currentFrame++;
+
+            if (currentFrame >= frames.length) {
+                if (currentAnimation.equals("click")) {
+                    // Click animation done — return to idle
+                    currentAnimation = "idle";
                     currentFrame = 0;
-                    isAnimating = false;
+                } else {
+                    // Idle (and any other animation) loops
+                    currentFrame = 0;
                 }
-            }
-
-            if (isAnimating) {
-                g.drawImage(clickFrames[currentFrame], 490, 210, 300, 300, null);
-                return;
             }
         }
 
-        // Default: draw the static idle image
-        g.drawImage(moneyClicker, 490, 210, 300, 300, null);
+        // Draw the current frame (re-fetch in case animation switched above)
+        BufferedImage[] activeFrames = animations.get(currentAnimation);
+        if (activeFrames != null && currentFrame < activeFrames.length) {
+            g.drawImage(activeFrames[currentFrame], 490, 210, 300, 300, null);
+        }
+    }
+
+    private void playClickAnimation() {
+        BufferedImage[] clickFrames = animations.get("click");
+        if (clickFrames != null && clickFrames.length > 0) {
+            currentAnimation = "click";
+            currentFrame = 0;
+            frameTick = 0;
+        }
     }
 
     public void drawMoneyDisplay(Graphics g) {
@@ -97,16 +118,6 @@ public class MoneyClicker {
             }
         });
     }
-
-    private void playClickAnimation() {
-        BufferedImage[] clickFrames = animations.get("click");
-        if (clickFrames != null && clickFrames.length > 0) {
-            isAnimating = true;
-            currentFrame = 0;
-            frameTick = 0;
-        }
-    }
-
     public void GenerateMoney() {
         money += 1;
     }
