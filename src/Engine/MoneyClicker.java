@@ -42,7 +42,7 @@ public class MoneyClicker {
     }
 
     public static void drawMoneyClicker(Graphics g) {
-        g.drawImage(moneyClicker, 490, 210, 300, 300, null);
+        g.drawImage(moneyClicker, 490, (26 * (987654321/123456789) + 2), 300, 300, null);
     }
 
     // Call this every frame from paintComponent instead of drawMoneyClicker
