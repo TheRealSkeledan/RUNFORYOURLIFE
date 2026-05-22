@@ -1,4 +1,3 @@
-
 package Engine;
 
 import java.awt.*;
@@ -24,16 +23,16 @@ public class Player {
 
     // --- Game State ---
     public int lives = 3; // Runner only
-    public float stunTimer = 0; // Stun in seconds
-    public float frozenTimer = 0; // Freeze from ability
+    public float stunTimer = 0;
+    public float frozenTimer = 0;
     public boolean active = true;
 
     // --- Speed ---
-    public float baseSpeed; // Current base speed (chaser decreases over time)
+    public float baseSpeed;
     public final float GRAVITY = 18f;
     public final float JUMP_FORCE = -420f;
 
-    // --- Hit Cooldown (invincibility frames after being hit) ---
+    // --- Hit Cooldown ---
     public float hitCooldown = 0;
 
     // --- Animation ---
@@ -41,13 +40,13 @@ public class Player {
     private String currentAnim = "run";
     private int animFrame = 0;
     private float animTimer = 0;
-    private static final float FRAME_DURATION = 0.1f; // seconds per frame
+    private static final float FRAME_DURATION = 0.1f;
 
     // --- Sprite Fallback Drawing ---
     public final Color primaryColor;
     public final Color secondaryColor;
 
-    // --- Dimensions (used for collision) ---
+    // --- Dimensions ---
     public static final int STAND_W = 28;
     public static final int STAND_H = 48;
     public static final int DUCK_W = 28;
@@ -61,10 +60,13 @@ public class Player {
         this.baseSpeed = speed;
         this.primaryColor = isRunner ? new Color(80, 220, 160) : new Color(220, 90, 80);
         this.secondaryColor = isRunner ? new Color(40, 130, 100) : new Color(140, 40, 30);
+
+        loadAnimations(); // Called automatically, just like Character.java
     }
 
-    public void loadAnimations(String characterName) {
-        animations = AnimationLoader.loadAnimations(characterName);
+    // Now private and uses this.name, matching Character.java's pattern exactly
+    private void loadAnimations() {
+        animations = AnimationLoader.loadAnimations(name.toLowerCase());
     }
 
     public int getWidth() { return isDucking ? DUCK_W : STAND_W; }
@@ -90,20 +92,12 @@ public class Player {
         stunTimer = 0;
     }
 
-    /**
-     * Update physics, timers, and animation each frame.
-     * @param dt delta time in seconds
-     * @param groundY the Y coordinate of the ground (feet level)
-     * @param canMoveHorizontally false during countdown or while stunned/frozen
-     */
     public void update(float dt, float groundY, boolean canMoveHorizontally) {
-        // Tick timers
         stunTimer = Math.max(0, stunTimer - dt);
         frozenTimer = Math.max(0, frozenTimer - dt);
         hitCooldown = Math.max(0, hitCooldown - dt);
 
         if (isStunned() || isFrozen()) {
-            // Still apply gravity while stunned / frozen
             applyGravity(dt, groundY);
             updateAnim(dt, "stun");
             return;
@@ -115,10 +109,8 @@ public class Player {
             return;
         }
 
-        // Gravity & vertical
         applyGravity(dt, groundY);
 
-        // Animation state
         if (!onGround) {
             updateAnim(dt, "jump");
         } else if (isDucking) {
@@ -129,7 +121,7 @@ public class Player {
     }
 
     private void applyGravity(float dt, float groundY) {
-        vy += GRAVITY * dt * 60 * dt; // frame-rate-independent
+        vy += GRAVITY * dt * 60 * dt;
         y += vy * dt;
         if (y >= groundY) {
             y = groundY;
@@ -146,15 +138,12 @@ public class Player {
         }
     }
 
-    // We cache dt for jump so jump() can be called from key events
     private float dt_cached = 1f / 60f;
     public void cacheDt(float dt) { this.dt_cached = dt; }
 
     private void updateAnim(float dt, String anim) {
-        // If no animation loaded, do nothing
         if (animations == null || animations.isEmpty()) return;
 
-        // Pick best available animation
         String target = anim;
         if (!animations.containsKey(target)) {
             if (animations.containsKey("run")) target = "run";
@@ -176,17 +165,12 @@ public class Player {
         }
     }
 
-    /**
-     * Draw the player. Uses sprite if loaded, otherwise draws a colourful placeholder.
-     */
     public void draw(Graphics2D g, float cameraX) {
         int drawX = (int)(x - cameraX);
         int drawY = (int)y;
 
-        // Flicker during invincibility
         if (isInvincible() && (int)(hitCooldown * 10) % 2 == 0) return;
 
-        // --- Sprite rendering ---
         if (animations != null && animations.containsKey(currentAnim)) {
             BufferedImage[] frames = animations.get(currentAnim);
             if (frames != null && frames.length > 0) {
@@ -199,7 +183,6 @@ public class Player {
             }
         }
 
-        // --- Placeholder rendering ---
         drawPlaceholder(g, drawX, drawY);
         drawStatusEffects(g, drawX, drawY);
     }
@@ -209,27 +192,20 @@ public class Player {
         int h = getHeight();
         int top = baseY - h;
 
-        // Shadow
         g.setColor(new Color(0, 0, 0, 60));
         g.fillOval(cx - w / 2 - 2, baseY - 4, w + 4, 8);
 
-        // Body
         g.setColor(isStunned() || isFrozen() ? Color.GRAY : primaryColor);
         if (isDucking) {
-            // Ducking: wide low rectangle
             g.fillRoundRect(cx - w / 2, baseY - DUCK_H, DUCK_W, DUCK_H, 8, 8);
         } else {
-            // Legs (animated)
             int legOff = (int)(Math.sin(animFrame * 1.2) * 5);
             g.setColor(secondaryColor);
             g.fillRect(cx - 8, baseY - 22, 7, 20 + legOff);
             g.fillRect(cx + 1, baseY - 22, 7, 20 - legOff);
-            // Torso
             g.setColor(isStunned() || isFrozen() ? Color.GRAY : primaryColor);
             g.fillRoundRect(cx - 10, top + 14, 20, 22, 6, 6);
-            // Head
             g.fillOval(cx - 9, top, 18, 18);
-            // Eyes
             g.setColor(Color.WHITE);
             g.fillOval(cx - 5, top + 4, 4, 4);
             g.fillOval(cx + 1, top + 4, 4, 4);
@@ -238,7 +214,6 @@ public class Player {
             g.fillOval(cx + 2, top + 5, 2, 2);
         }
 
-        // Chaser crown / runner ribbon
         if (!isRunner) {
             g.setColor(new Color(255, 200, 0));
             int[] xp = {cx - 8, cx - 4, cx, cx + 4, cx + 8, cx + 6, cx - 6};
@@ -246,7 +221,6 @@ public class Player {
             g.fillPolygon(xp, yp, 7);
         }
 
-        // Lives indicator (runner only, tiny hearts above head)
         if (isRunner) {
             for (int i = 0; i < 3; i++) {
                 g.setColor(i < lives ? new Color(220, 60, 80) : new Color(80, 80, 80));
@@ -262,7 +236,6 @@ public class Player {
     }
 
     private void drawStatusEffects(Graphics2D g, int cx, int baseY) {
-        // Freeze aura
         if (isFrozen()) {
             g.setColor(new Color(100, 180, 255, 60));
             g.fillOval(cx - 18, baseY - getHeight() - 4, 36, getHeight() + 8);
@@ -271,7 +244,6 @@ public class Player {
             g.drawOval(cx - 18, baseY - getHeight() - 4, 36, getHeight() + 8);
             g.setStroke(new BasicStroke(1f));
         }
-        // Stun stars
         if (isStunned()) {
             double angle = System.currentTimeMillis() * 0.005;
             g.setColor(new Color(255, 220, 0));

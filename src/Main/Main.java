@@ -7,7 +7,7 @@ import java.awt.*;
 public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("CHASE — A Two-Player Pursuit Game");
+            JFrame frame = new JFrame("RUN FOR YOUR LIFE");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setResizable(true);
 
