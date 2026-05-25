@@ -1,31 +1,82 @@
 package Main;
 
 import Panel.GamePanel;
+import Panel.MenuPanel;
+import Panel.SelectionScreen;
+
 import javax.swing.*;
 import java.awt.*;
 
 public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
+
             JFrame frame = new JFrame("RUN FOR YOUR LIFE");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setResizable(true);
+            frame.getContentPane().setBackground(Color.BLACK);
+            frame.setLayout(new BorderLayout());
 
-            GamePanel gamePanel;
+            MenuPanel menuPanel;
             try {
-                gamePanel = new GamePanel();
+                menuPanel = new MenuPanel(frame);
             } catch (Exception e) {
                 e.printStackTrace();
                 return;
             }
 
-            frame.add(gamePanel);
+            frame.add(menuPanel, BorderLayout.CENTER);
             frame.pack();
-            frame.setMinimumSize(new Dimension(640, 420));
+            frame.setMinimumSize(new Dimension(640, 360));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
 
-            gamePanel.requestFocusInWindow();
+            menuPanel.requestFocusInWindow();
         });
+    }
+
+    /** Menu → SelectionScreen (called after the click pulse fades). */
+    public static void goToSelection(JFrame frame, javax.sound.sampled.Clip musicClip) {
+        SelectionScreen sel;
+        try {
+            sel = new SelectionScreen(frame, musicClip);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+        swapPanel(frame, sel);
+    }
+
+    /** SelectionScreen → GamePanel (called when Confirm is clicked). */
+    public static void startGame(JFrame frame, String mode) {
+        GamePanel gamePanel;
+        try {
+            gamePanel = new GamePanel(frame, mode);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+        swapPanel(frame, gamePanel);
+        gamePanel.requestFocusInWindow();
+    }
+
+    /** GamePanel (ESC on game-over) → MenuPanel. */
+    public static void goToMenu(JFrame frame) {
+        MenuPanel menuPanel;
+        try {
+            menuPanel = new MenuPanel(frame);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+        swapPanel(frame, menuPanel);
+    }
+
+    private static void swapPanel(JFrame frame, JPanel next) {
+        frame.getContentPane().removeAll();
+        frame.getContentPane().add(next, BorderLayout.CENTER);
+        frame.revalidate();
+        frame.repaint();
+        next.requestFocusInWindow();
     }
 }
