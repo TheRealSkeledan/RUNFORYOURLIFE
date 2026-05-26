@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spritesheet>
+    <character name="chaser" spriteWidth="360" spriteHeight="360">
+        <animations>
+
+            <animation name="run">
+                <frame x="0" y="0"/>
+                <frame x="360" y="0"/>
+                <frame x="720" y="0"/>
+                <frame x="0" y="360"/>
+            </animation>
+
+            <animation name="stun">
+                <frame x="360" y="360"/>
+            </animation>
+            
+            <animation name="jump">
+                <frame x="720" y="360"/>
+                <frame x="0" y="720"/>
+            </animation>
+
+            <animation name="duck">
+                <frame x="360" y="1080"/>
+            </animation>
+
+            <animation name="attack">
+                <frame x="360" y="720"/>
+                <frame x="720" y="720"/>
+                <frame x="0" y="1080"/>
+                <frame x="360" y="1080"/>
+                <frame x="720" y="1080"/>
+            </animation>
+
+        </animations>
+    </character>
+</spritesheet>

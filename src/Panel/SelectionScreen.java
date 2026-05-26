@@ -42,8 +42,10 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
     private static final float DT       = 0.016f;
 
     // ── Asset paths ────────────────────────────────────────────────────────────
-    private static final String UI        = "assets/images/ui/";
-    private static final String CLICK_SFX = "assets/sfx/MenuClick.wav";
+    private static final String UI          = "assets/images/ui/";
+    private static final String CLICK_SFX   = "assets/sfx/MenuClick.wav";
+    private static final String CONFIRM_SFX = "assets/sfx/MenuConfirm.wav";
+    private static final String INFO_SFX    = "assets/sfx/MenuInfo.wav";
 
     // ── Modes ─────────────────────────────────────────────────────────────────
     private enum Mode { NORMAL, HARDCORE, HOTEL }
@@ -52,23 +54,17 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
     // ── Mode descriptions (shown in info popup) ────────────────────────────────
     private static final String[] MODE_NAMES = { "NORMAL", "HARDCORE", "HOTEL" };
     private static final String[] MODE_DESC  = {
-            """
-The classic experience.
-Run from the Chaser with 2 minutes on the clock
-Survivor has 3 lives, obstacles do normal pushback.
-A fair fight""",
+            "The classic experience. Run from the Chaser across procedurally\n" +
+                    "generated levels. Three lives. Obstacles scale with distance.\n" +
+                    "A fair fight — if you're fast enough.",
 
-            """
-Survivor only has 1 life. No more chances.
-A minute and 30 seconds on the clock.
-Obstacles do heavy pushback.
-Made for quick rounds.""",
+            "No lives. One hit and it's over.\n" +
+                    "The Chaser is faster, smarter, and relentless.\n" +
+                    "Only the desperate dare enter Hardcore.",
 
-            """
-Oh... I finally found you. I can't believe I found you.
-I found you.
-Ready Or Not
-Here I Come"""
+            "Set inside the Hotel. Narrow corridors, flickering lights,\n" +
+                    "and something worse than the Chaser lurking in the walls.\n" +
+                    "Check in. You won't check out."
     };
 
     // ── Images ────────────────────────────────────────────────────────────────
@@ -114,7 +110,12 @@ Here I Come"""
 
     // ── Audio ─────────────────────────────────────────────────────────────────
     private SoundEffect clickSfx;
+    private SoundEffect confirmSfx;
+    private SoundEffect infoSfx;
     private final javax.sound.sampled.Clip musicClip;
+
+    // ── Hardcore visual intensity (0 = none, 1 = full) — smoothly interpolated
+    private float hardcoreIntensity = 0f;
 
     // ── Frame / timer ─────────────────────────────────────────────────────────
     private final JFrame frame;
@@ -192,6 +193,10 @@ Here I Come"""
         if (newBeat)     heartbeatFlash = Math.max(heartbeatFlash, 0.38f);
         if (newHalfBeat) heartbeatFlash = Math.max(heartbeatFlash, 0.12f);
         heartbeatFlash = Math.max(0f, heartbeatFlash - 0.030f);
+
+        // ── Hardcore visual intensity — smooth in/out ─────────────────────
+        float targetIntensity = (selected == Mode.HARDCORE) ? 1f : 0f;
+        hardcoreIntensity += (targetIntensity - hardcoreIntensity) * 0.06f;
 
         // ── Hardcore shake ────────────────────────────────────────────────
         if (selected == Mode.HARDCORE) {
@@ -285,32 +290,38 @@ Here I Come"""
     }
 
     private void loadSfx() {
-        try { clickSfx = new SoundEffect(CLICK_SFX); }
-        catch (Exception e) { System.err.println("SelectionScreen: SFX missing"); }
+        try { clickSfx   = new SoundEffect(CLICK_SFX);   } catch (Exception e) { System.err.println("SelectionScreen: missing " + CLICK_SFX);   }
+        try { confirmSfx = new SoundEffect(CONFIRM_SFX); } catch (Exception e) { System.err.println("SelectionScreen: missing " + CONFIRM_SFX); }
+        try { infoSfx    = new SoundEffect(INFO_SFX);    } catch (Exception e) { System.err.println("SelectionScreen: missing " + INFO_SFX);    }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  RENDER
     // ─────────────────────────────────────────────────────────────────────────
     private void render() {
-        // ── Compute this-frame tilt + shake offset ────────────────────────
+        // ── Background draws FIRST, before any tilt — stays fixed ─────────
+        drawBackground();
+
+        // ── Compute tilt + shake offset for everything else ───────────────
         int ox = Math.round(tiltX + shakeX);
         int oy = Math.round(tiltY + shakeY);
-
-        // Draw everything offset by (ox, oy) — gives the parallax tilt + shake
         og.translate(ox, oy);
 
-        drawBackground();
         drawParticles();
         drawDivider();
         drawPreview();
-        drawTitleRow();     // mode title image + info button
+        drawTitleRow();
         drawModeButtons();
         drawConfirmButton();
         drawVignette();
         drawScanlines();
 
-        og.translate(-ox, -oy);   // reset transform
+        og.translate(-ox, -oy);
+
+        // ── Hardcore overlays (smooth in/out via hardcoreIntensity) ───────
+        if (hardcoreIntensity > 0.01f) {
+            drawHardcoreEffects();
+        }
 
         // Overlays that should NOT move with the tilt
         if (heartbeatFlash > 0f) {
@@ -330,16 +341,86 @@ Here I Come"""
         if (popupOpen) drawPopup();
     }
 
-    // ── Background ────────────────────────────────────────────────────────────
+    // ── Hardcore effects (red tint + vignette + chromatic aberration) ─────────
+
+    // ── Chromatic aberration — additive RGB fringe, never darkens ────────────
+    // Reusable fringe images allocated once
+    private BufferedImage redFringe;
+    private BufferedImage blueFringe;
+
+    private void buildFringeImages(int shift) {
+        if (redFringe == null || redFringe.getWidth() != W) {
+            redFringe  = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+            blueFringe = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+        }
+
+        int[] srcPixels  = offscreen.getRGB(0, 0, W, H, null, 0, W);
+        int[] redPixels  = new int[W * H];
+        int[] bluePixels = new int[W * H];
+
+        for (int y = 0; y < H; y++) {
+            for (int x = 0; x < W; x++) {
+                int srcX = x - shift;   // source X for red fringe (shift right = read from left)
+                if (srcX >= 0 && srcX < W) {
+                    int argb  = srcPixels[y * W + srcX];
+                    int a     = (argb >> 24) & 0xFF;
+                    int r     = (argb >> 16) & 0xFF;
+                    // Alpha of fringe pixel = red channel brightness so dark pixels vanish
+                    redPixels[y * W + x] = ((r * a / 255) << 24) | (r << 16);
+                }
+
+                int srcXb = x + shift;  // source X for blue fringe (shift left = read from right)
+                if (srcXb >= 0 && srcXb < W) {
+                    int argb  = srcPixels[y * W + srcXb];
+                    int a     = (argb >> 24) & 0xFF;
+                    int b     = (argb)       & 0xFF;
+                    bluePixels[y * W + x] = ((b * a / 255) << 24) | b;
+                }
+            }
+        }
+
+        redFringe.setRGB(0, 0, W, H, redPixels,  0, W);
+        blueFringe.setRGB(0, 0, W, H, bluePixels, 0, W);
+    }
+
+    private void drawHardcoreEffects() {
+        float hi = hardcoreIntensity;
+
+        // ── Red tint wash ─────────────────────────────────────────────────
+        og.setColor(new Color(160, 0, 0, (int)(hi * 55)));
+        og.fillRect(0, 0, W, H);
+
+        // ── Red vignette ──────────────────────────────────────────────────
+        float beatSwell = (float)Math.max(0, 1f - beatPhase / 0.35f);
+        int vigAlpha = (int)(hi * (90 + beatSwell * 60));
+        og.setPaint(new RadialGradientPaint(
+                W / 2f, H / 2f, W * 0.60f,
+                new float[]{0.30f, 1.0f},
+                new Color[]{new Color(0, 0, 0, 0),
+                        new Color(120, 0, 0, Math.min(255, vigAlpha))}));
+        og.fillRect(0, 0, W, H);
+
+        // ── Chromatic aberration ───────────────────────────────────────────
+        int shift = Math.round(hi * 14f);
+        if (shift < 1) return;
+
+        buildFringeImages(shift);
+
+        // Additive-style blend: fringe alpha already encodes channel brightness,
+        // so transparent pixels never darken anything beneath them
+        float fringeOpacity = Math.min(1f, hi * 0.75f);
+        og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, fringeOpacity));
+        og.drawImage(redFringe,  0, 0, null);
+        og.drawImage(blueFringe, 0, 0, null);
+        og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+    }
     private void drawBackground() {
         if (imgBG != null) {
-            // Draw BG slightly oversized so tilt doesn't show black edges
-            og.drawImage(imgBG, -(int)TILT_MAX - 2, -(int)TILT_MAX - 2,
-                    W + (int)(TILT_MAX * 2) + 4, H + (int)(TILT_MAX * 2) + 4, null);
+            og.drawImage(imgBG, 0, 0, W, H, null);
         } else {
             GradientPaint bg = new GradientPaint(0, 0, new Color(8, 2, 2), 0, H, new Color(22, 4, 4));
             og.setPaint(bg);
-            og.fillRect(-20, -20, W + 40, H + 40);
+            og.fillRect(0, 0, W, H);
         }
 
         // Beat bloom over the bg
@@ -637,7 +718,7 @@ Here I Come"""
         // If popup is open, any click closes it
         if (popupOpen) { popupOpen = false; return; }
 
-        if      (rectInfo.contains(p))     { popupOpen = true; }
+        if      (rectInfo.contains(p))     { popupOpen = true; if (infoSfx != null) infoSfx.play(); else if (clickSfx != null) clickSfx.play(); }
         else if (rectNormal.contains(p))   selectMode(Mode.NORMAL);
         else if (rectHardcore.contains(p)) selectMode(Mode.HARDCORE);
         else if (rectHotel.contains(p))    selectMode(Mode.HOTEL);
@@ -671,7 +752,8 @@ Here I Come"""
     private void onConfirm() {
         if (launching) return;
         if (musicClip != null && musicClip.isRunning()) { musicClip.stop(); musicClip.close(); }
-        if (clickSfx != null) clickSfx.play();
+        if (confirmSfx != null) confirmSfx.play();
+        else if (clickSfx != null) clickSfx.play();   // fallback if file missing
         clickPulse = 1.0f;
         launching  = true;
     }

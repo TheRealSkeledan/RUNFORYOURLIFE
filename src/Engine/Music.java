@@ -9,10 +9,9 @@ import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 public class Music {
-	private static Clip clip;
-	private static String SP;
-	private static AudioInputStream audioInputStream;
-	private static int movement = 0;
+    private Clip clip;
+    private String SP;
+    private AudioInputStream audioInputStream;
 
 	public Music(String SP) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
 		this.SP = SP;
@@ -20,47 +19,23 @@ public class Music {
 		clip = AudioSystem.getClip();
 	}
 
-	public Music(String SP, boolean hasParts) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
-		this.SP = SP;
+    public void play() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
+        clip.close();
+        audioInputStream = AudioSystem.getAudioInputStream(new File(SP + ".wav").getAbsoluteFile());
 
-		if(hasParts) {
-			audioInputStream = AudioSystem.getAudioInputStream(new File(SP + ".wav").getAbsoluteFile());
-		} else {
-			audioInputStream = AudioSystem.getAudioInputStream(new File(SP + movement + ".wav").getAbsoluteFile());
-		}
-			
-		clip = AudioSystem.getClip();
-	}
-
-	public static void play() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
         clip.open(audioInputStream);
-          
         clip.loop(Clip.LOOP_CONTINUOUSLY);
-	}
+        clip.start();
+    }
 
-	public static void playSFX() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
+	public void playSFX() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
 		clip.open(audioInputStream);
 
 		clip.start();
 	}
 
-	public static void stop() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
-		clip.stop();
-
-		audioInputStream = AudioSystem.getAudioInputStream(new File(SP + "End.wav").getAbsoluteFile());
-		clip.open(audioInputStream);
-
-		clip.start();
-	}
-
-	public static void next() throws UnsupportedAudioFileException, IOException, LineUnavailableException {
-		clip.stop();
-
-		movement++;
-
-		audioInputStream = AudioSystem.getAudioInputStream(new File(SP + movement + ".wav").getAbsoluteFile());
-		clip.open(audioInputStream);
-
-		clip.start();
-	}
+    public void stop() {
+        clip.stop();
+        clip.close();
+    }
 }

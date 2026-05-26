@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spritesheet>
+    <character name="runner" spriteWidth="300" spriteHeight="356">
+        <animations>
+
+            <animation name="run">
+                <frame x="0" y="0"/>
+                <frame x="300" y="0"/>
+                <frame x="600" y="0"/>
+                <frame x="0" y="356"/>
+            </animation>
+
+            <animation name="stun">
+                <frame x="300" y="356"/>
+                <frame x="600" y="356"/>
+            </animation>
+            
+            <animation name="jump">
+                <frame x="0" y="712"/>
+            </animation>
+
+            <animation name="duck">
+                <frame x="300" y="712"/>
+            </animation>
+
+        </animations>
+    </character>
+</spritesheet>

@@ -14,7 +14,7 @@ public class Obstacle {
     public enum Type { GROUND, AERIAL }
 
     public float x;
-    public final float y; // foot/centre-y depending on type
+    public float y; // foot/centre-y depending on type
     public final int width;
     public final int height;
     public final Type type;
