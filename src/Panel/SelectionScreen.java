@@ -54,20 +54,28 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
     // ── Mode descriptions (shown in info popup) ────────────────────────────────
     private static final String[] MODE_NAMES = { "NORMAL", "HARDCORE", "HOTEL" };
     private static final String[] MODE_DESC  = {
-            "The classic experience. Run from the Chaser across procedurally\n" +
-                    "generated levels. Three lives. Obstacles scale with distance.\n" +
-                    "A fair fight — if you're fast enough.",
+            """
+The classic experience.\s
+Runner: run through the corridors and don't get caught
+Chaser: Make sure to slow the runner and catch them
+Runner has three chances, obstacles are easy to dodge, 2 minutes on the clock
+A balanced experience... if you're fast enough""",
 
-            "No lives. One hit and it's over.\n" +
-                    "The Chaser is faster, smarter, and relentless.\n" +
-                    "Only the desperate dare enter Hardcore.",
+            """
+An equivalent to speedrun mode.
+Runner only has 1 chance, only 1:30 on the clock
+Obstacles do heavy push back to the chaser and are very fast
+Good luck.""",
 
-            "Set inside the Hotel. Narrow corridors, flickering lights,\n" +
-                    "and something worse than the Chaser lurking in the walls.\n" +
-                    "Check in. You won't check out."
+            """
+Oh... I finally found...
+I can't believe I found you...
+I found you.
+Ready or not
+Here I Come
+"""
     };
 
-    // ── Images ────────────────────────────────────────────────────────────────
     private BufferedImage imgBG;
 
     private BufferedImage previewNormal, previewHardcore, previewHotel;
@@ -75,80 +83,60 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
     private BufferedImage btnNormal,     btnHardcore,     btnHotel;
     private BufferedImage btnConfirm,    btnInfo;
 
-    // ── Layout — right column ─────────────────────────────────────────────────
     private static final int LEFT_W      = 640;
-    private static final int RIGHT_CX    = 960;   // centre of right half
+    private static final int RIGHT_CX    = 960;
 
-    // Title row (top of right panel)
-    private static final int TITLE_CY    = 90;    // centre Y of mode title image
-    private static final int INFO_MARGIN = 16;    // gap between title right edge and info btn
+    private static final int TITLE_CY    = 90;
+    private static final int INFO_MARGIN = 16;
 
-    // Mode buttons
     private static final int BTN_Y_START = 240;
     private static final int BTN_Y_GAP   = 145;
 
-    // Confirm
     private static final int CONFIRM_CY  = 648;
 
-    // Hit rectangles
     private Rectangle rectNormal, rectHardcore, rectHotel, rectConfirm, rectInfo;
 
-    // ── Hover ─────────────────────────────────────────────────────────────────
     private enum Hover { NONE, NORMAL, HARDCORE, HOTEL, CONFIRM, INFO }
     private Hover hover = Hover.NONE;
 
-    // ── Info popup ────────────────────────────────────────────────────────────
     private boolean popupOpen = false;
 
-    // ── Click-pulse / launch ──────────────────────────────────────────────────
     private float   clickPulse = 0f;
     private boolean launching  = false;
 
-    // ── Offscreen buffer ──────────────────────────────────────────────────────
     private final BufferedImage offscreen;
     private final Graphics2D    og;
 
-    // ── Audio ─────────────────────────────────────────────────────────────────
     private SoundEffect clickSfx;
     private SoundEffect confirmSfx;
     private SoundEffect infoSfx;
     private final javax.sound.sampled.Clip musicClip;
 
-    // ── Hardcore visual intensity (0 = none, 1 = full) — smoothly interpolated
     private float hardcoreIntensity = 0f;
 
-    // ── Frame / timer ─────────────────────────────────────────────────────────
     private final JFrame frame;
     private final Timer  repaintTimer;
 
-    // ── Time / BPM ────────────────────────────────────────────────────────────
     private float t         = 0f;
     private float beatPhase = 0f;
     private float heartbeatFlash = 0f;
 
-    // ── Hardcore shake ────────────────────────────────────────────────────────
     private float shakeX = 0f, shakeY = 0f;
 
-    // ── Mouse parallax tilt ────────────────────────────────────────────────────
-    //    Logical mouse position, smoothed
     private float mouseLogX = W / 2f, mouseLogY = H / 2f;
-    private float tiltX = 0f, tiltY = 0f;   // current tilt offsets (px)
-    private static final float TILT_MAX    = 10f;  // max px of drift
+    private float tiltX = 0f, tiltY = 0f;
+    private static final float TILT_MAX    = 10f;
     private static final float TILT_SMOOTH = 0.08f;
 
-    // ── Particles ─────────────────────────────────────────────────────────────
     private static final int PC = 40;
     private final float[] px, py, pvx, pvy, psize, palpha;
     private final Random rng = new Random();
 
-    // ── Scanline flicker ──────────────────────────────────────────────────────
     private float flickerAlpha = 0f;
 
-    // ── Preview slide-in ──────────────────────────────────────────────────────
     private float previewOffsetX = 0f;
     private float previewAlpha   = 1f;
 
-    // ─────────────────────────────────────────────────────────────────────────
     public SelectionScreen(JFrame frame, javax.sound.sampled.Clip musicClip) throws Exception {
         this.frame     = frame;
         this.musicClip = musicClip;
@@ -178,13 +166,9 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
 
     @Override public Dimension getPreferredSize() { return new Dimension(W, H); }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  TICK
-    // ─────────────────────────────────────────────────────────────────────────
     private void tick() {
         t += DT;
 
-        // ── BPM ───────────────────────────────────────────────────────────
         float prev = beatPhase;
         beatPhase += DT / BEAT_SEC;
         boolean newBeat     = beatPhase >= 1f;
@@ -194,11 +178,9 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         if (newHalfBeat) heartbeatFlash = Math.max(heartbeatFlash, 0.12f);
         heartbeatFlash = Math.max(0f, heartbeatFlash - 0.030f);
 
-        // ── Hardcore visual intensity — smooth in/out ─────────────────────
         float targetIntensity = (selected == Mode.HARDCORE) ? 1f : 0f;
         hardcoreIntensity += (targetIntensity - hardcoreIntensity) * 0.06f;
 
-        // ── Hardcore shake ────────────────────────────────────────────────
         if (selected == Mode.HARDCORE) {
             float amp = 3.5f;
             float rad  = beatPhase * 2f * (float)Math.PI;
@@ -209,24 +191,19 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             shakeY *= 0.85f;
         }
 
-        // ── Mouse parallax tilt ───────────────────────────────────────────
-        //    Target: shift towards mouse, ±TILT_MAX px from centre
         float targetTiltX = ((mouseLogX / W) - 0.5f) * 2f * TILT_MAX;
         float targetTiltY = ((mouseLogY / H) - 0.5f) * 2f * TILT_MAX;
         tiltX += (targetTiltX - tiltX) * TILT_SMOOTH;
         tiltY += (targetTiltY - tiltY) * TILT_SMOOTH;
 
-        // ── Particles ─────────────────────────────────────────────────────
         for (int i = 0; i < PC; i++) {
             px[i] += pvx[i]; py[i] += pvy[i]; palpha[i] -= 0.004f;
             if (py[i] > H + 20 || palpha[i] <= 0) resetParticle(i, false);
         }
 
-        // ── Preview slide-in ──────────────────────────────────────────────
         previewOffsetX *= 0.78f;
         previewAlpha    = Math.min(1f, previewAlpha + 0.08f);
 
-        // ── Click pulse / launch ──────────────────────────────────────────
         if (clickPulse > 0f) {
             clickPulse = Math.max(0f, clickPulse - 0.045f);
             if (clickPulse <= 0f && launching) {
@@ -236,7 +213,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             }
         }
 
-        // ── Flicker ───────────────────────────────────────────────────────
         if (rng.nextFloat() < 0.012f) flickerAlpha = 0.05f + rng.nextFloat() * 0.09f;
         flickerAlpha = Math.max(0f, flickerAlpha - 0.006f);
     }
@@ -250,9 +226,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         palpha[i]= 0.35f + rng.nextFloat() * 0.5f;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  ASSETS
-    // ─────────────────────────────────────────────────────────────────────────
     private void loadImages() {
         imgBG          = tryLoad(UI + "SelectionBG.png");
         previewNormal   = tryLoad(UI + "NormalMode.png");
@@ -278,8 +251,7 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         rectHardcore = nativeRect(btnHardcore, RIGHT_CX, BTN_Y_START + BTN_Y_GAP,    320, 80);
         rectHotel    = nativeRect(btnHotel,    RIGHT_CX, BTN_Y_START + BTN_Y_GAP * 2,320, 80);
         rectConfirm  = nativeRect(btnConfirm,  RIGHT_CX, CONFIRM_CY,                 320, 80);
-        // Info button: positioned to the right of the title — computed in drawTitleRow()
-        // We initialise it here with a placeholder and update it each frame during draw
+
         rectInfo = new Rectangle(W - 80, TITLE_CY - 20, 40, 40);
     }
 
@@ -295,14 +267,9 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         try { infoSfx    = new SoundEffect(INFO_SFX);    } catch (Exception e) { System.err.println("SelectionScreen: missing " + INFO_SFX);    }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  RENDER
-    // ─────────────────────────────────────────────────────────────────────────
     private void render() {
-        // ── Background draws FIRST, before any tilt — stays fixed ─────────
         drawBackground();
 
-        // ── Compute tilt + shake offset for everything else ───────────────
         int ox = Math.round(tiltX + shakeX);
         int oy = Math.round(tiltY + shakeY);
         og.translate(ox, oy);
@@ -318,12 +285,10 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
 
         og.translate(-ox, -oy);
 
-        // ── Hardcore overlays (smooth in/out via hardcoreIntensity) ───────
         if (hardcoreIntensity > 0.01f) {
             drawHardcoreEffects();
         }
 
-        // Overlays that should NOT move with the tilt
         if (heartbeatFlash > 0f) {
             og.setColor(new Color(180, 0, 0, (int)(heartbeatFlash * 110)));
             og.fillRect(0, 0, W, H);
@@ -337,14 +302,9 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             og.fillRect(0, 0, W, H);
         }
 
-        // Info popup drawn last, no tilt (it sits on top of everything)
         if (popupOpen) drawPopup();
     }
 
-    // ── Hardcore effects (red tint + vignette + chromatic aberration) ─────────
-
-    // ── Chromatic aberration — additive RGB fringe, never darkens ────────────
-    // Reusable fringe images allocated once
     private BufferedImage redFringe;
     private BufferedImage blueFringe;
 
@@ -360,16 +320,16 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
 
         for (int y = 0; y < H; y++) {
             for (int x = 0; x < W; x++) {
-                int srcX = x - shift;   // source X for red fringe (shift right = read from left)
+                int srcX = x - shift;
                 if (srcX >= 0 && srcX < W) {
                     int argb  = srcPixels[y * W + srcX];
                     int a     = (argb >> 24) & 0xFF;
                     int r     = (argb >> 16) & 0xFF;
-                    // Alpha of fringe pixel = red channel brightness so dark pixels vanish
+
                     redPixels[y * W + x] = ((r * a / 255) << 24) | (r << 16);
                 }
 
-                int srcXb = x + shift;  // source X for blue fringe (shift left = read from right)
+                int srcXb = x + shift;
                 if (srcXb >= 0 && srcXb < W) {
                     int argb  = srcPixels[y * W + srcXb];
                     int a     = (argb >> 24) & 0xFF;
@@ -386,11 +346,9 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
     private void drawHardcoreEffects() {
         float hi = hardcoreIntensity;
 
-        // ── Red tint wash ─────────────────────────────────────────────────
         og.setColor(new Color(160, 0, 0, (int)(hi * 55)));
         og.fillRect(0, 0, W, H);
 
-        // ── Red vignette ──────────────────────────────────────────────────
         float beatSwell = (float)Math.max(0, 1f - beatPhase / 0.35f);
         int vigAlpha = (int)(hi * (90 + beatSwell * 60));
         og.setPaint(new RadialGradientPaint(
@@ -400,14 +358,11 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
                         new Color(120, 0, 0, Math.min(255, vigAlpha))}));
         og.fillRect(0, 0, W, H);
 
-        // ── Chromatic aberration ───────────────────────────────────────────
         int shift = Math.round(hi * 14f);
         if (shift < 1) return;
 
         buildFringeImages(shift);
 
-        // Additive-style blend: fringe alpha already encodes channel brightness,
-        // so transparent pixels never darken anything beneath them
         float fringeOpacity = Math.min(1f, hi * 0.75f);
         og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, fringeOpacity));
         og.drawImage(redFringe,  0, 0, null);
@@ -423,12 +378,10 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             og.fillRect(0, 0, W, H);
         }
 
-        // Beat bloom over the bg
         float bb = (float)Math.pow(Math.max(0, 1f - beatPhase * 3f), 2f);
         drawRadialGlow(W / 2, H / 2, 480, new Color(120, 4, 4, (int)(20 + bb * 35)));
     }
 
-    // ── Divider ───────────────────────────────────────────────────────────────
     private void drawDivider() {
         og.setColor(new Color(120, 10, 10, 80));
         og.setStroke(new BasicStroke(2f));
@@ -437,7 +390,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         drawRadialGlow(LEFT_W, H / 2, 55, new Color(160, 0, 0, 28));
     }
 
-    // ── Preview (left half) ───────────────────────────────────────────────────
     private void drawPreview() {
         BufferedImage preview = switch (selected) {
             case NORMAL   -> previewNormal;
@@ -449,7 +401,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, previewAlpha));
 
         if (preview != null) {
-            // Fill entire left half, maintaining aspect ratio, centred
             float aspect = (float) preview.getWidth() / preview.getHeight();
             int drawW, drawH;
             if ((float) LEFT_W / H > aspect) {
@@ -479,7 +430,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         og.setComposite(old);
     }
 
-    // ── Title row: mode name image + info button ───────────────────────────────
     private void drawTitleRow() {
         BufferedImage title = switch (selected) {
             case NORMAL   -> titleNormal;
@@ -487,8 +437,7 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             case HOTEL    -> titleHotel;
         };
 
-        // ── Title image ───────────────────────────────────────────────────
-        int titleX = LEFT_W + 20;   // left-aligned in right panel with small margin
+        int titleX = LEFT_W + 20;
         int titleY = TITLE_CY;
 
         if (title != null) {
@@ -496,13 +445,11 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             int th = title.getHeight();
             og.drawImage(title, titleX, titleY - th / 2, tw, th, null);
 
-            // Position info button to the right of the title image
             int infoSize = btnInfo != null ? Math.max(btnInfo.getWidth(), 36) : 36;
             int infoBtnX = titleX + tw + INFO_MARGIN;
             int infoBtnY = titleY - infoSize / 2;
             rectInfo = new Rectangle(infoBtnX, infoBtnY, infoSize, infoSize);
         } else {
-            // Fallback text title
             og.setFont(new Font("Monospaced", Font.BOLD, 34));
             og.setColor(new Color(220, 50, 50));
             og.drawString(MODE_NAMES[selected.ordinal()], titleX, titleY + 12);
@@ -512,7 +459,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             rectInfo = new Rectangle(infoBtnX, titleY - 18, 36, 36);
         }
 
-        // ── Info button ───────────────────────────────────────────────────
         boolean hovInfo = hover == Hover.INFO;
         if (hovInfo) drawRadialGlow(rectInfo.x + rectInfo.width / 2,
                 rectInfo.y + rectInfo.height / 2,
@@ -525,7 +471,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
                 og.fillRect(rectInfo.x, rectInfo.y, rectInfo.width, rectInfo.height);
             }
         } else {
-            // Fallback '?' circle
             Color c = hovInfo || popupOpen ? new Color(220, 60, 60) : new Color(140, 30, 30);
             og.setColor(c);
             og.fillOval(rectInfo.x, rectInfo.y, rectInfo.width, rectInfo.height);
@@ -538,7 +483,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         }
     }
 
-    // ── Mode buttons ──────────────────────────────────────────────────────────
     private void drawModeButtons() {
         drawModeButton(btnNormal,   rectNormal,   hover == Hover.NORMAL,   selected == Mode.NORMAL,   "NORMAL");
         drawModeButton(btnHardcore, rectHardcore, hover == Hover.HARDCORE, selected == Mode.HARDCORE, "HARDCORE");
@@ -583,7 +527,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         }
     }
 
-    // ── Confirm button ────────────────────────────────────────────────────────
     private void drawConfirmButton() {
         boolean hov = hover == Hover.CONFIRM;
         float scale = hov ? 1.07f : 1.0f;
@@ -610,9 +553,7 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         }
     }
 
-    // ── Info popup ────────────────────────────────────────────────────────────
     private void drawPopup() {
-        // Semi-transparent dark overlay over the whole screen
         og.setColor(new Color(0, 0, 0, 185));
         og.fillRect(0, 0, W, H);
 
@@ -628,14 +569,12 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         og.drawRoundRect(boxX, boxY, boxW, boxH, 18, 18);
         og.setStroke(new BasicStroke(1f));
 
-        // Mode name header
         og.setFont(new Font("Monospaced", Font.BOLD, 26));
         og.setColor(new Color(220, 50, 50));
         String header = "— " + MODE_NAMES[selected.ordinal()] + " —";
         FontMetrics fmH = og.getFontMetrics();
         og.drawString(header, boxX + (boxW - fmH.stringWidth(header)) / 2, boxY + 46);
 
-        // Description (multi-line, split on \n)
         og.setFont(new Font("Monospaced", Font.PLAIN, 17));
         og.setColor(new Color(210, 170, 170));
         FontMetrics fmD = og.getFontMetrics();
@@ -647,7 +586,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
             textY += lineH + 4;
         }
 
-        // "Click anywhere to close" hint
         og.setFont(new Font("Monospaced", Font.ITALIC, 13));
         og.setColor(new Color(130, 60, 60));
         String hint = "click anywhere to close";
@@ -655,7 +593,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         og.drawString(hint, boxX + (boxW - fmHint.stringWidth(hint)) / 2, boxY + boxH - 18);
     }
 
-    // ── Particles ─────────────────────────────────────────────────────────────
     private void drawParticles() {
         for (int i = 0; i < PC; i++) {
             int a = (int)(palpha[i] * 255); if (a <= 0) continue;
@@ -667,7 +604,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         }
     }
 
-    // ── Vignette ──────────────────────────────────────────────────────────────
     private void drawVignette() {
         float swell = (float)Math.max(0, 1f - beatPhase / 0.3f);
         int alpha   = (int)(155 + swell * 50);
@@ -677,13 +613,11 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         og.fillRect(-20, -20, W + 40, H + 40);
     }
 
-    // ── Scanlines ─────────────────────────────────────────────────────────────
     private void drawScanlines() {
         og.setColor(new Color(0, 0, 0, 25));
         for (int y = -20; y < H + 20; y += 3) og.drawLine(-20, y, W + 20, y);
     }
 
-    // ── Radial glow ───────────────────────────────────────────────────────────
     private void drawRadialGlow(int cx, int cy, int r, Color c) {
         if (r <= 0) return;
         og.setPaint(new RadialGradientPaint(cx, cy, r, new float[]{0f, 1f},
@@ -691,7 +625,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         og.fillOval(cx - r, cy - r, r * 2, r * 2);
     }
 
-    // ── Viewport scaling ──────────────────────────────────────────────────────
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -702,7 +635,6 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         g.drawImage(offscreen, drawX, drawY, drawW, drawH, null);
     }
 
-    // ── Screen → logical ──────────────────────────────────────────────────────
     private Point toLogical(int sx, int sy) {
         int panelW = getWidth(), panelH = getHeight();
         float scale = Math.min((float) panelW / W, (float) panelH / H);
@@ -711,11 +643,9 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
         return new Point(Math.round((sx - drawX) / scale), Math.round((sy - drawY) / scale));
     }
 
-    // ── Input ─────────────────────────────────────────────────────────────────
     private void handleClick(int sx, int sy) {
         Point p = toLogical(sx, sy);
 
-        // If popup is open, any click closes it
         if (popupOpen) { popupOpen = false; return; }
 
         if      (rectInfo.contains(p))     { popupOpen = true; if (infoSfx != null) infoSfx.play(); else if (clickSfx != null) clickSfx.play(); }
