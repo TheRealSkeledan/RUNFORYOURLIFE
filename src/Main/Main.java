@@ -1,13 +1,25 @@
 package Main;
-
 import Panel.GamePanel;
 import Panel.MenuPanel;
 import Panel.SelectionScreen;
+import Panel.AchievementsPanel;
 
 import javax.swing.*;
 import java.awt.*;
 
 public class Main {
+    /** Menu → AchievementsPanel. */
+/** MenuPanel → AchievementsPanel */
+    public static void goToAchievements(JFrame frame) {
+        AchievementsPanel achievementsPanel;
+        try {
+            achievementsPanel = new AchievementsPanel(frame);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+        swapPanel(frame, achievementsPanel);
+    }
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
 

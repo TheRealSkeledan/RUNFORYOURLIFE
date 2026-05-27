@@ -11,6 +11,7 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.Random;
+import Main.Main;
 
 /**
  * MenuPanel — 1280×720 horror main menu, synced to 80 BPM (0.75 s / beat).
@@ -112,6 +113,17 @@ public class MenuPanel extends JPanel implements MouseListener, MouseMotionListe
 
     // ─────────────────────────────────────────────────────────────────────────
     public MenuPanel(JFrame frame) throws Exception {
+        /*JButton achievementsButton = new JButton("ACHIEVEMENTS");
+
+// If you are using structural custom buttons or standard listeners, attach it like this:
+achievementsButton.addActionListener(e -> {
+    // Optional: stop menu clip music if required, or simply change panel state
+    Main.goToAchievements(frame);
+});
+
+// Remember to add the component to your layout array!
+// this.add(achievementsButton);*/
+
         this.frame = frame;
         setBackground(Color.BLACK);
         setFocusable(true);
@@ -525,7 +537,10 @@ public class MenuPanel extends JPanel implements MouseListener, MouseMotionListe
     /** Exposes the live music clip so it can be handed off to SelectionScreen. */
     public Clip getMusicClip() { return musicClip; }
 
-    private void onAchievements() { System.out.println("Achievements — not yet implemented"); }
+private void onAchievements() {
+    Main.goToAchievements(frame);
+}    // This switches the panel over to your new screen instead of printing a stub!
+    
     private void onCredits()      { System.out.println("Credits — not yet implemented"); }
 
     // ── Mouse ─────────────────────────────────────────────────────────────────
