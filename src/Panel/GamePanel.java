@@ -182,7 +182,10 @@ public class GamePanel extends JPanel implements ActionListener {
             menuMusicClip.close();
         }
         try {
-            bgm = new Music("assets/music/NormalChaseTrack");
+            String track = (diff == Difficulty.HARDCORE)
+                    ? "assets/music/HardcoreChaseTrack"
+                    : "assets/music/NormalChaseTrack";
+            bgm = new Music(track);
             bgm.play();
         } catch (Exception ex) {
             ex.printStackTrace();
