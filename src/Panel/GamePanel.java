@@ -1,5 +1,7 @@
 package Panel;
 
+
+
 import Engine.Music;
 import Engine.Obstacle;
 import Engine.Player;
@@ -24,6 +26,9 @@ import java.util.Random;
  */
 public class GamePanel extends JPanel implements ActionListener {
 
+    // ── Delegates ─────────────────────────────────────────────────────────────
+private final AchievementSystem  achievements = new AchievementSystem(); // ← ADD THIS
+    
     // ── Screen / timing constants ─────────────────────────────────────────────
     private static final int   W        = 1280;
     private static final int   H        = 720;
@@ -220,6 +225,8 @@ public class GamePanel extends JPanel implements ActionListener {
         runner.lives = 3;
 
         state = State.PLAYING;
+        achievements.resetForNewGame();
+
     }
 
     // ── Main loop ─────────────────────────────────────────────────────────────
@@ -266,14 +273,20 @@ public class GamePanel extends JPanel implements ActionListener {
 
     private void update(float dt) {
         elapsed += dt;
+        achievements.update(dt);
+achievements.tick(elapsed, diff);
         clock.update(dt);
         timeline.update(clock, dt);
 
         // Timer
         if (TIME_LIMIT[di] > 0) {
             timeLeft -= dt;
-            if (timeLeft <= 0) { timeLeft = 0; endGame(true); return; }
-        }
+if (timeLeft <= 0) {
+    timeLeft = 0;
+    achievements.onTimerExpired(); // ← ADD THIS
+    endGame(true);
+    return;
+}        }
 
         // Speed ramp: accelerate during intense sections, recover during calm ones
         float targetSpeed = timeline.isIntenseSection()
@@ -300,8 +313,11 @@ public class GamePanel extends JPanel implements ActionListener {
                 runnerVY     = PhysicsEngine.JUMP_FORCE;
                 runnerGround = false;
                 runnerDuck   = false;
+                achievements.onJump();
             }
-            runnerDuck = input.runnerDuck && runnerGround;
+            boolean wasDucking = runnerDuck;
+runnerDuck = input.runnerDuck && runnerGround;
+if (runnerDuck && !wasDucking) achievements.onDuck();
         }
 
         if (!runnerGround) {
@@ -327,6 +343,7 @@ public class GamePanel extends JPanel implements ActionListener {
                 float projY = chaserY - PH * 0.6f;
                 projectiles.add(new Projectile(chaserX + PW / 2f, projY));
                 chaserThrowCooldown = THROW_COOLDOWN;
+                achievements.onProjectileFired();
             }
         }
 
@@ -371,7 +388,7 @@ public class GamePanel extends JPanel implements ActionListener {
         while (it.hasNext()) {
             Obstacle obs = it.next();
             obs.x -= obsSpeed * dt;
-            if (obs.x + obs.width < -80) { it.remove(); continue; }
+            if (obs.x + obs.width < -80) { it.remove(); achievements.onObstacleAvoided(); continue; }
             handleObstacleCollisions(obs);
         }
     }
@@ -423,6 +440,7 @@ public class GamePanel extends JPanel implements ActionListener {
     }
 
     private void hitRunner() {
+        achievements.onRunnerHit();
         runnerHits++;
         runner.lives  = 3 - runnerHits;
         runnerStun    = STUN_DUR[di];
@@ -433,6 +451,11 @@ public class GamePanel extends JPanel implements ActionListener {
     }
 
     private void endGame(boolean runnerWins) {
+        if (runnerWins) {
+        achievements.onRunnerWin(elapsed, diff); // ← ADD THIS
+    } else {
+        achievements.onChaserWin(diff);          // ← ADD THIS
+    }
         runnerWon = runnerWins;
         state     = State.GAME_OVER;
     }
@@ -456,6 +479,9 @@ public class GamePanel extends JPanel implements ActionListener {
 
         hud.drawHUD(og, runnerHits, chaserThrowCooldown, THROW_COOLDOWN,
                 timeLeft, TIME_LIMIT[di], elapsed, diff);
+                achievements.drawToasts(og); // ← ADD THIS
+
+
 
         og.setColor(Color.WHITE);
         og.setFont(new Font("Consolas", Font.BOLD, 24));
