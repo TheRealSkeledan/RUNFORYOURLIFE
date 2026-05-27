@@ -3,26 +3,26 @@ package Panel;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.BufferedImageOp;
+import java.awt.image.ColorConvertOp;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 /**
- * BackgroundRenderer — handles scrolling backgrounds, floor grid,
- * alarm lights, scanlines, and the Hotel atmosphere effect.
+ * BackgroundRenderer — scrolling backgrounds, floor grid, alarm lights,
+ * scanlines, hotel atmosphere, and music-driven effects via {@link SongTimeline}.
  *
- * Call {@link #init()} once after construction, then call the draw*
- * methods each frame from GamePanel.render().
+ * Greyscale is applied as a full-screen post-process using {@code grey} (0..1).
+ * Alarms and scanlines are suppressed entirely during calm sections.
  */
 public class BackgroundRenderer {
 
-    // ── Constants shared with GamePanel ──────────────────────────────────────
+    // ── Layout constants ──────────────────────────────────────────────────────
     private static final int   W        = 1280;
     private static final int   H        = 720;
     private static final float GROUND_Y = 580f;
-    private static final float BPM      = 160f;
-    private static final float BEAT_HZ  = BPM / 60f;
 
     // ── Scrolling background ──────────────────────────────────────────────────
     private record BgSegment(BufferedImage img, float x, int drawW, int drawH) {}
@@ -30,8 +30,7 @@ public class BackgroundRenderer {
     private BufferedImage[] bgImages = new BufferedImage[0];
     private final Random rng;
 
-    // ── Animated effect state ─────────────────────────────────────────────────
-    private float alarmPhase     = 0f;
+    // ── Scanline state (purely cosmetic, driven by beat) ──────────────────────
     private float scanlineOffset = 0f;
 
     // ── Hotel atmosphere ──────────────────────────────────────────────────────
@@ -39,23 +38,37 @@ public class BackgroundRenderer {
     private float hotelFlicker = 0f;
     private final Random hotelRng = new Random();
 
+    // ── Break-flash ───────────────────────────────────────────────────────────
+    /** Brightness 0..1 that fades out after the break-bar hit. */
+    private float breakFlash = 0f;
+
+    // ── Greyscale scratch buffer ──────────────────────────────────────────────
+    private BufferedImage greyBuffer;
+    private final ColorConvertOp greyOp =
+            new ColorConvertOp(java.awt.color.ColorSpace.getInstance(
+                    java.awt.color.ColorSpace.CS_GRAY), null);
+
+    // ── Constructor ───────────────────────────────────────────────────────────
+
     public BackgroundRenderer(Random rng) {
         this.rng = rng;
+        // Scratch buffer for greyscale compositing
+        greyBuffer = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
     }
 
     // ── Initialisation ────────────────────────────────────────────────────────
 
     public void init() {
         loadBgImages();
-        resetSegments(0f);
+        resetSegments();
     }
 
     public void reset() {
-        alarmPhase     = 0f;
         scanlineOffset = 0f;
         hotelPhase     = 0f;
         hotelFlicker   = 0f;
-        resetSegments(0f);
+        breakFlash     = 0f;
+        resetSegments();
     }
 
     private void loadBgImages() {
@@ -70,9 +83,9 @@ public class BackgroundRenderer {
         bgImages = list.toArray(new BufferedImage[0]);
     }
 
-    private void resetSegments(float startX) {
+    private void resetSegments() {
         bgSegments.clear();
-        float fillX = startX;
+        float fillX = 0f;
         while (fillX < W + 400) {
             BgSegment seg = makeRandomSegment(fillX);
             bgSegments.add(seg);
@@ -88,53 +101,36 @@ public class BackgroundRenderer {
         return new BgSegment(img, x, drawW, drawH);
     }
 
-    // ── Per-frame draws ───────────────────────────────────────────────────────
+    // ── Main draw entry point ─────────────────────────────────────────────────
 
     /**
-     * Main background: scrolling images (or gradient fallback) + floor grid
-     * + alarm lights + scanlines.
+     * Draw everything that lives behind the players.
+     * The caller should have already translated the Graphics2D by
+     * {@code (timeline.shakeX, timeline.shakeY)} before calling this.
+     *
+     * @param g        offscreen Graphics2D (already shake-translated by caller)
+     * @param obsSpeed current obstacle scroll speed
+     * @param dt       delta time in seconds
+     * @param diff     current difficulty
+     * @param clock    live BeatClock
+     * @param timeline live SongTimeline (updated this tick)
      */
-    public void drawBackground(Graphics2D g, float obsSpeed, float dt,
+    public void drawBackground(Graphics2D g,
+                               float obsSpeed, float dt,
                                GamePanel.Difficulty diff,
-                               float timeLeft, float timeLimitTotal) {
+                               BeatClock clock,
+                               SongTimeline timeline) {
 
-        int skyH = (int) GROUND_Y;
+        drawSkyAndSegments(g, obsSpeed, dt, diff);
+        drawFloorGrid(g, obsSpeed, dt);
 
-        // Scrolling image segments
-        if (bgImages.length > 0) {
-            float scrollDelta = obsSpeed * dt * 3f;
-            bgSegments.replaceAll(s -> new BgSegment(s.img(), s.x() - scrollDelta, s.drawW(), s.drawH()));
-            bgSegments.removeIf(s -> s.x() + s.drawW() < 0);
-            float rightEdge = bgSegments.isEmpty() ? 0f : bgSegments.getLast().x() + bgSegments.getLast().drawW();
-            while (rightEdge < W + 200) {
-                BgSegment seg = makeRandomSegment(rightEdge);
-                bgSegments.add(seg);
-                rightEdge += seg.drawW();
-            }
-            for (BgSegment seg : bgSegments)
-                if (seg.img() != null)
-                    g.drawImage(seg.img(), (int) seg.x(), 0, seg.drawW(), seg.drawH(), null);
-        } else {
-            // Gradient fallback
-            Color top = switch (diff) {
-                case HARDCORE -> new Color(18, 10, 10);
-                case HOTEL    -> new Color(22,  8,  8);
-                default       -> new Color(28, 24, 50);
-            };
-            Color bot = switch (diff) {
-                case HARDCORE -> new Color(35, 12, 12);
-                case HOTEL    -> new Color(45, 15, 10);
-                default       -> new Color(55, 40, 80);
-            };
-            g.setPaint(new GradientPaint(0, 0, top, 0, skyH, bot));
-            g.fillRect(0, 0, W, skyH);
+        // Alarms and scanlines only during intense sections
+        if (timeline.isIntenseSection()) {
+            drawAlarmLights(g, clock, timeline, diff);
+            drawScanlines(g, clock, dt);
         }
 
-        drawFloorGrid(g, obsSpeed, dt);
-        drawAlarmLights(g, dt, diff, timeLeft, timeLimitTotal);
-        drawScanlines(g, dt);
-
-        // Difficulty tints
+        // Difficulty tints (always on)
         if (diff == GamePanel.Difficulty.HARDCORE) {
             g.setColor(new Color(60, 0, 0, 55));
             g.fillRect(0, 0, W, (int) GROUND_Y);
@@ -143,12 +139,21 @@ public class BackgroundRenderer {
             g.setColor(new Color(80, 0, 0, 70));
             g.fillRect(0, 0, W, (int) GROUND_Y);
         }
+
+        // Break flash — white slam on the break bar
+        if (timeline.onBreakHit) breakFlash = 1f;
+        if (breakFlash > 0f) {
+            g.setColor(new Color(255, 255, 255, (int)(breakFlash * 200)));
+            g.fillRect(0, 0, W, H);
+            breakFlash = Math.max(0f, breakFlash - dt * 4f);   // ~0.25 s fade
+        }
     }
 
-    /** Hotel-specific atmospheric overlay — call after drawBackground. */
-    public void drawHotelAtmosphere(Graphics2D g, float dt) {
-        hotelPhase   += dt * 0.4f;
-        if (hotelRng.nextFloat() < 0.008f)
+    /** Hotel-specific atmospheric vignette — call after drawBackground. */
+    public void drawHotelAtmosphere(Graphics2D g, float dt, SongTimeline timeline) {
+        hotelPhase += dt * 0.4f;
+        // Flicker only during intense sections
+        if (timeline.isIntenseSection() && hotelRng.nextFloat() < 0.008f)
             hotelFlicker = 0.08f + hotelRng.nextFloat() * 0.16f;
         hotelFlicker = Math.max(0, hotelFlicker - 0.012f);
 
@@ -165,9 +170,64 @@ public class BackgroundRenderer {
         }
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    /**
+     * Post-process greyscale composite over the whole frame.
+     * Call this AFTER all other drawing (players, HUD) is done,
+     * passing the same offscreen BufferedImage so it can blend in-place.
+     *
+     * @param offscreen the full offscreen frame buffer
+     * @param grey      0 = full colour, 1 = full greyscale
+     */
+    public void applyGreyscale(BufferedImage offscreen, float grey) {
+        if (grey <= 0.005f) return;
 
-    private float bgScrollX = 0f;  // tracks scrolling for floor grid perspective
+        // Convert to greyscale into scratch buffer
+        greyOp.filter(offscreen, greyBuffer);
+
+        // Blend greyscale over original using grey as alpha
+        Graphics2D g = offscreen.createGraphics();
+        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, grey));
+        g.drawImage(greyBuffer, 0, 0, null);
+        g.dispose();
+    }
+
+    // ── Private draw helpers ──────────────────────────────────────────────────
+
+    private float bgScrollX = 0f;
+
+    private void drawSkyAndSegments(Graphics2D g, float obsSpeed, float dt,
+                                    GamePanel.Difficulty diff) {
+        int skyH = (int) GROUND_Y;
+
+        if (bgImages.length > 0) {
+            float scrollDelta = obsSpeed * dt * 3f;
+            bgSegments.replaceAll(s -> new BgSegment(s.img(), s.x() - scrollDelta, s.drawW(), s.drawH()));
+            bgSegments.removeIf(s -> s.x() + s.drawW() < 0);
+            float rightEdge = bgSegments.isEmpty() ? 0f
+                    : bgSegments.getLast().x() + bgSegments.getLast().drawW();
+            while (rightEdge < W + 200) {
+                BgSegment seg = makeRandomSegment(rightEdge);
+                bgSegments.add(seg);
+                rightEdge += seg.drawW();
+            }
+            for (BgSegment seg : bgSegments)
+                if (seg.img() != null)
+                    g.drawImage(seg.img(), (int) seg.x(), 0, seg.drawW(), seg.drawH(), null);
+        } else {
+            Color top = switch (diff) {
+                case HARDCORE -> new Color(18, 10, 10);
+                case HOTEL    -> new Color(22,  8,  8);
+                default       -> new Color(28, 24, 50);
+            };
+            Color bot = switch (diff) {
+                case HARDCORE -> new Color(35, 12, 12);
+                case HOTEL    -> new Color(45, 15, 10);
+                default       -> new Color(55, 40, 80);
+            };
+            g.setPaint(new GradientPaint(0, 0, top, 0, skyH, bot));
+            g.fillRect(0, 0, W, skyH);
+        }
+    }
 
     private void drawFloorGrid(Graphics2D g, float obsSpeed, float dt) {
         bgScrollX += obsSpeed * 0.35f * dt;
@@ -179,7 +239,6 @@ public class BackgroundRenderer {
         g.setColor(new Color(255, 60, 60, 35));
         g.fillRect(0, floorTop, W, floorBot - floorTop);
 
-        // Horizontal lines
         g.setColor(new Color(255, 80, 80, 60));
         int lineCount = 8;
         for (int i = 0; i <= lineCount; i++) {
@@ -188,7 +247,6 @@ public class BackgroundRenderer {
             g.drawLine(0, y, W, y);
         }
 
-        // Perspective vertical lines converging to vanishing point
         float scroll = (bgScrollX * 1.5f) % 120;
         g.setColor(new Color(255, 80, 80, 45));
         for (float vx = -scroll; vx < W + 120; vx += 120)
@@ -197,48 +255,48 @@ public class BackgroundRenderer {
         g.setStroke(new BasicStroke(1f));
     }
 
-    private void drawAlarmLights(Graphics2D g, float dt,
-                                 GamePanel.Difficulty diff,
-                                 float timeLeft, float timeLimitTotal) {
-        alarmPhase += dt * BEAT_HZ * (float)(Math.PI * 2);
+    private void drawAlarmLights(Graphics2D g, BeatClock clock,
+                                 SongTimeline timeline, GamePanel.Difficulty diff) {
+        float intensity = timeline.intensity;
+        float pulse     = 0.5f + 0.5f * (float) Math.sin(clock.barPhase * Math.PI * 2f);
 
-        float urgency = timeLimitTotal > 0
-                ? 1f - Math.min(1f, timeLeft / timeLimitTotal)
-                : 1f;
-        if (diff == GamePanel.Difficulty.HOTEL) urgency = 0.6f;
-
-        float pulse     = 0.5f + 0.5f * (float) Math.sin(alarmPhase);
-        int   baseAlpha = (int)(30 + urgency * 60 + pulse * (40 + urgency * 60));
-        baseAlpha       = Math.min(baseAlpha, 180);
+        // Beat punch makes the alarm flash hard on every downbeat
+        float punch   = clock.beatPunch(0.4f);
+        int baseAlpha = (int)(30 + intensity * 80 + punch * 80);
+        baseAlpha     = Math.min(baseAlpha, 180);
 
         g.setColor(new Color(200, 0, 0, baseAlpha));
         g.fillRect(0, 0, W, H);
 
-        drawStrobeLight(g, 60,      -20, pulse, urgency);
-        drawStrobeLight(g, W - 60,  -20, pulse, urgency);
+        drawStrobeLight(g, 60,      -20, pulse, intensity);
+        drawStrobeLight(g, W - 60,  -20, pulse, intensity);
 
-        if (timeLimitTotal > 0 && timeLeft < 20f) {
-            float critPulse = 0.5f + 0.5f * (float) Math.sin(alarmPhase * 2f);
-            drawStrobeLight(g, W / 2, -20, critPulse, 1f);
+        // Extra centre strobe on FULL_FORCE / INTENSE2 on beat 3 (backbeat)
+        if ((timeline.section == SongTimeline.Section.FULL_FORCE
+                || timeline.section == SongTimeline.Section.INTENSE2)
+                && clock.isBarBeat(2)) {
+            drawStrobeLight(g, W / 2, -20, clock.beatPunch(0.3f), 1f);
         }
     }
 
     private void drawStrobeLight(Graphics2D g, int cx, int cy, float pulse, float urgency) {
-        int    radius  = (int)(350 + urgency * 150);
-        float[] fracs  = { 0f, 0.4f, 1f };
-        int    alpha1  = (int)(80 + pulse * (60 + urgency * 80));
-        int    alpha2  = (int)(20 + pulse * 30);
-        Color[] colors = {
+        int    radius = (int)(350 + urgency * 150);
+        float[] fracs = { 0f, 0.4f, 1f };
+        int alpha1    = (int)(80 + pulse * (60 + urgency * 80));
+        int alpha2    = (int)(20 + pulse * 30);
+        Color[] cols  = {
                 new Color(255, 30, 30, Math.min(alpha1, 200)),
                 new Color(200, 0,  0,  Math.min(alpha2, 100)),
                 new Color(120, 0,  0,  0)
         };
-        g.setPaint(new RadialGradientPaint(cx, cy, radius, fracs, colors));
+        g.setPaint(new RadialGradientPaint(cx, cy, radius, fracs, cols));
         g.fillOval(cx - radius, cy - radius, radius * 2, radius * 2);
     }
 
-    private void drawScanlines(Graphics2D g, float dt) {
-        scanlineOffset = (scanlineOffset + BEAT_HZ * 40f * dt) % 4f;
+    private void drawScanlines(Graphics2D g, BeatClock clock, float dt) {
+        // Speed up scanlines slightly on every beat for a subtle pulse
+        float speedMult = 1f + clock.beatPunch(0.5f) * 2f;
+        scanlineOffset = (scanlineOffset + (160f / 60f) * 40f * dt * speedMult) % 4f;
 
         Composite original = g.getComposite();
         g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.18f));

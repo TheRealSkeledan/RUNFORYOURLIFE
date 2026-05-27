@@ -31,6 +31,20 @@ public class GamePanel extends JPanel implements ActionListener {
     private static final int   TICK_MS  = 16;
     private static final float DT       = TICK_MS / 1000f;
 
+    /**
+     * How many seconds the audio engine typically takes to actually start
+     * playing after bgm.play() is called.  Pre-seeds the BeatClock so visual
+     * effects land on the beat rather than trailing it.
+     * Tune this value if effects still feel early or late (try 0.1 – 0.3 s).
+     */
+    private static final float AUDIO_LATENCY = 0.20f;
+
+    /**
+     * Extra bar offset if the clock still feels ahead or behind after tuning
+     * AUDIO_LATENCY.  2 bars = 3.0 s at 160 BPM.  Set to 0 if not needed.
+     */
+    private static final float BEAT_OFFSET_BARS = 0f;
+
     // ── Player geometry ───────────────────────────────────────────────────────
     private static final int PW     = 180;
     private static final int PH     = 310;
@@ -101,10 +115,17 @@ public class GamePanel extends JPanel implements ActionListener {
     }
     private final List<Projectile> projectiles = new ArrayList<>();
 
+    // ── FPS Counter ──────────────────────────────────────────────────────────────
+    private int fps = 0;
+    private int frames = 0;
+    private long lastFpsTime = System.currentTimeMillis();
+
     // ── Delegates ─────────────────────────────────────────────────────────────
-    private final InputHandler       input  = new InputHandler();
+    private final InputHandler       input    = new InputHandler();
     private final BackgroundRenderer bgr;
-    private final HudRenderer        hud    = new HudRenderer();
+    private final HudRenderer        hud      = new HudRenderer();
+    private final BeatClock          clock    = new BeatClock(160f);
+    private final SongTimeline       timeline = new SongTimeline();
 
     // ── Rendering ─────────────────────────────────────────────────────────────
     private final BufferedImage offscreen;
@@ -187,6 +208,9 @@ public class GamePanel extends JPanel implements ActionListener {
         nextSpawnTimer = 1.8f;
 
         bgr.reset();
+        float barDur = 60f / 160f * 4f;   // 1.5 s per bar at 160 BPM
+        clock.reset(AUDIO_LATENCY + BEAT_OFFSET_BARS * barDur);
+        timeline.reset();
 
         runner = new Player("runner", true,  runnerKnockX, runnerY, OBS_SPEED[di]);
         chaser = new Player("chaser", false, chaserX,      chaserY, OBS_SPEED[di]);
@@ -203,6 +227,16 @@ public class GamePanel extends JPanel implements ActionListener {
         if (state == State.PLAYING) update(DT);
         render();
         repaint();
+
+        frames++;
+
+        long current = System.currentTimeMillis();
+        if (current - lastFpsTime >= 1000) {
+            fps = frames;
+            frames = 0;
+            lastFpsTime = current;
+        }
+
         input.consumeSingleFrameActions();
     }
 
@@ -229,6 +263,8 @@ public class GamePanel extends JPanel implements ActionListener {
 
     private void update(float dt) {
         elapsed += dt;
+        clock.update(dt);
+        timeline.update(clock, dt);
 
         // Timer
         if (TIME_LIMIT[di] > 0) {
@@ -236,7 +272,12 @@ public class GamePanel extends JPanel implements ActionListener {
             if (timeLeft <= 0) { timeLeft = 0; endGame(true); return; }
         }
 
-        obsSpeed = OBS_SPEED[di] + SPEED_RAMP[di] * elapsed;
+        // Speed ramp: accelerate during intense sections, recover during calm ones
+        float targetSpeed = timeline.isIntenseSection()
+                ? OBS_SPEED[di] + SPEED_RAMP[di] * elapsed
+                : OBS_SPEED[di];
+        // Smooth transition so speed doesn't snap
+        obsSpeed += (targetSpeed - obsSpeed) * 2.0f * dt;
 
         // Cool-down timers
         runnerStun          = Math.max(0, runnerStun          - dt);
@@ -399,18 +440,29 @@ public class GamePanel extends JPanel implements ActionListener {
         og.setColor(Color.BLACK);
         og.fillRect(0, 0, W, H);
 
-        bgr.drawBackground(og, obsSpeed, DT, diff, timeLeft, TIME_LIMIT[di]);
+        // Save transform, apply shake, draw world, then restore — prevents drift
+        java.awt.geom.AffineTransform saved = og.getTransform();
+        og.translate((int) timeline.shakeX, (int) timeline.shakeY);
+        bgr.drawBackground(og, obsSpeed, DT, diff, clock, timeline);
         drawWarnings();
         for (Obstacle obs : obstacles) obs.draw(og, 0f);
         drawProjectiles();
         drawPlayers();
-        if (diff == Difficulty.HOTEL) bgr.drawHotelAtmosphere(og, DT);
+        if (diff == Difficulty.HOTEL) bgr.drawHotelAtmosphere(og, DT, timeline);
+        og.setTransform(saved);   // hard restore — no floating point drift
 
         hud.drawHUD(og, runnerHits, chaserThrowCooldown, THROW_COOLDOWN,
                 timeLeft, TIME_LIMIT[di], elapsed, diff);
 
+        og.setColor(Color.WHITE);
+        og.setFont(new Font("Consolas", Font.BOLD, 24));
+        og.drawString("FPS: " + fps, 20, 40);
+
         if (state == State.PAUSED)    hud.drawPauseOverlay(og);
         if (state == State.GAME_OVER) hud.drawGameOverOverlay(og, runnerWon, diff, elapsed, timeLeft);
+
+        // Greyscale post-process — fast int-array path, only active during grey sections
+        bgr.applyGreyscale(offscreen, timeline.grey);
     }
 
     private void drawWarnings() {
