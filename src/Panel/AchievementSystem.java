@@ -108,6 +108,11 @@ public class AchievementSystem {
                 Tier.GOLD,    "\uD83D\uDD14"),
     };
 
+    /** Clamps a 0-255 alpha int so Color never throws. */
+    private static int a(float alpha, int max) {
+        return Math.max(0, Math.min(max, (int)(max * alpha)));
+    }
+
     // ── Achievement definition ────────────────────────────────────────────────
 
     public enum Tier { BRONZE, SILVER, GOLD }
@@ -284,10 +289,10 @@ public class AchievementSystem {
         int y = H - (toast.slot + 1) * (TOAST_H + TOAST_MARGIN) - 20;
 
         // ── Panel shadow ──────────────────────────────────────────────────────
-        g.setColor(new Color(0, 0, 0, (int)(100 * alpha)));
+        g.setColor(new Color(0, 0, 0, a(alpha, 100)));
         g.fill(new RoundRectangle2D.Float(x + 4, y + 4, TOAST_W, TOAST_H, 14, 14));
 
-        // ── Tier accent colour ─────────────────────────────────────────────────
+        // ── Tier accent colour ────────────────────────────────────────────────
         Color accent = switch (toast.ach.tier) {
             case BRONZE -> new Color(205, 127,  50);
             case SILVER -> new Color(180, 180, 200);
@@ -295,42 +300,37 @@ public class AchievementSystem {
         };
 
         // ── Background panel ──────────────────────────────────────────────────
-        Color bg = new Color(20, 15, 30, (int)(230 * alpha));
-        g.setColor(bg);
+        g.setColor(new Color(20, 15, 30, a(alpha, 230)));
         g.fill(new RoundRectangle2D.Float(x, y, TOAST_W, TOAST_H, 14, 14));
 
         // ── Left accent stripe ────────────────────────────────────────────────
-        Color stripeColor = new Color(accent.getRed(), accent.getGreen(), accent.getBlue(),
-                                      (int)(220 * alpha));
-        g.setColor(stripeColor);
+        g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), a(alpha, 220)));
         g.fill(new RoundRectangle2D.Float(x, y, 6, TOAST_H, 6, 6));
 
         // ── Border ────────────────────────────────────────────────────────────
-        g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(),
-                             (int)(90 * alpha)));
+        g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), a(alpha, 90)));
         g.setStroke(new BasicStroke(1.2f));
         g.draw(new RoundRectangle2D.Float(x, y, TOAST_W, TOAST_H, 14, 14));
         g.setStroke(new BasicStroke(1f));
 
         // ── "ACHIEVEMENT UNLOCKED" label ──────────────────────────────────────
         g.setFont(new Font("Arial", Font.BOLD, 10));
-        g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(),
-                             (int)(200 * alpha)));
+        g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), a(alpha, 200)));
         g.drawString("ACHIEVEMENT UNLOCKED", x + 14, y + 16);
 
         // ── Icon ──────────────────────────────────────────────────────────────
         g.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 26));
-        g.setColor(new Color(255, 255, 255, (int)(220 * alpha)));
+        g.setColor(new Color(255, 255, 255, a(alpha, 220)));
         g.drawString(toast.ach.icon, x + 12, y + TOAST_H - 12);
 
         // ── Title ─────────────────────────────────────────────────────────────
         g.setFont(new Font("Arial", Font.BOLD, 15));
-        g.setColor(new Color(255, 255, 255, (int)(240 * alpha)));
+        g.setColor(new Color(255, 255, 255, a(alpha, 240)));
         g.drawString(toast.ach.title, x + 48, y + TOAST_H - 26);
 
         // ── Description ───────────────────────────────────────────────────────
         g.setFont(new Font("Arial", Font.PLAIN, 11));
-        g.setColor(new Color(180, 170, 200, (int)(190 * alpha)));
+        g.setColor(new Color(180, 170, 200, a(alpha, 190)));
         g.drawString(toast.ach.description, x + 48, y + TOAST_H - 12);
     }
 
