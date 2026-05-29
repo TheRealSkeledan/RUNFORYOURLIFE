@@ -387,7 +387,7 @@ if (runnerDuck && !wasDucking) achievements.onDuck();
         Iterator<Obstacle> it = obstacles.iterator();
         while (it.hasNext()) {
             Obstacle obs = it.next();
-            obs.x -= obsSpeed * dt;
+            obs.x -= obsSpeed * dt * 3;
             if (obs.x + obs.width < -80) { it.remove(); achievements.onObstacleAvoided(); continue; }
             handleObstacleCollisions(obs);
         }
