@@ -200,7 +200,7 @@ public class BackgroundRenderer {
         int skyH = (int) GROUND_Y;
 
         if (bgImages.length > 0) {
-            float scrollDelta = obsSpeed * dt * 3f;
+            float scrollDelta = obsSpeed * dt * 6f;
             bgSegments.replaceAll(s -> new BgSegment(s.img(), s.x() - scrollDelta, s.drawW(), s.drawH()));
             bgSegments.removeIf(s -> s.x() + s.drawW() < 0);
             float rightEdge = bgSegments.isEmpty() ? 0f
