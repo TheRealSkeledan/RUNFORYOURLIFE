@@ -56,7 +56,8 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     private static final int DUCK_H = 160;
 
     private static final float RUNNER_X = W * 0.65f;
-    private static final float CHASER_X = W * 0.28f;
+    private static final float CHASER_X = W * 0.08f;
+    private float chaserHomeX = CHASER_X;
 
     // ── Difficulty tables ─────────────────────────────────────────────────────
     public enum Difficulty { NORMAL, HARDCORE, HOTEL }
@@ -208,7 +209,7 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         runnerDuck = false; runnerStun = 0f; runnerInvince = 0f;
         runnerHits = 0; runnerKnockX = RUNNER_X;
 
-        chaserX = CHASER_X; chaserY = GROUND_Y; chaserVY = 0f;
+        chaserX = CHASER_X; chaserHomeX = CHASER_X; chaserY = GROUND_Y; chaserVY = 0f;
         chaserGround = true; chaserDuck = false; chaserStun = 0f;
         chaserThrowCooldown = 0f;
 
@@ -354,7 +355,7 @@ if (runnerDuck && !wasDucking) achievements.onDuck();
             chaserGround = (chaserY >= GROUND_Y);
         }
 
-        chaserX = PhysicsEngine.recoverX(chaserX, CHASER_X, 80f, dt);
+        chaserX = PhysicsEngine.recoverX(chaserX, chaserHomeX, 80f, dt);
         if (chaserX + PW / 2f < 0) { endGame(true); }
     }
 
@@ -448,6 +449,8 @@ if (runnerDuck && !wasDucking) achievements.onDuck();
         runnerKnockX  = Math.max(chaserX + PW / 2f + 20f, runnerKnockX - 90f);
         runner.applyStun(STUN_DUR[di]);
         if (runnerHits >= 3) endGame(false);
+        chaserX += 80f;
+        chaserHomeX += 80f;
     }
 
     private void endGame(boolean runnerWins) {
