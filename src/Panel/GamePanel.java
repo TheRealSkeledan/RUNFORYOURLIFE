@@ -92,8 +92,13 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     private float   runnerStun    = 0f;
     private float   runnerInvince = 0f;
     private int     runnerHits    = 0;
-    private float   runnerKnockX  = RUNNER_X;
 
+    private float   runnerKnockX  = RUNNER_X;
+    private float runnerDodgeTimer    = 0f;
+    private float runnerDodgeCooldown = 0f;
+    private static final float DODGE_DURATION = 0.6f;
+    private static final float DODGE_COOLDOWN = 2.0f;
+    private static final float DODGE_Y        = 430f;
     // ── Chaser state ──────────────────────────────────────────────────────────
     private Player  chaser;
     private float   chaserY             = GROUND_Y;
@@ -207,6 +212,7 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
 
         runnerY = GROUND_Y; runnerVY = 0f; runnerGround = true;
         runnerDuck = false; runnerStun = 0f; runnerInvince = 0f;
+
         runnerHits = 0; runnerKnockX = RUNNER_X;
 
         chaserX = CHASER_X; chaserHomeX = CHASER_X; chaserY = GROUND_Y; chaserVY = 0f;
@@ -310,15 +316,27 @@ if (timeLeft <= 0) {
 
     private void updateRunner(float dt) {
         if (runnerStun <= 0) {
+
             if (input.runnerJump && runnerGround) {
                 runnerVY     = PhysicsEngine.JUMP_FORCE;
                 runnerGround = false;
                 runnerDuck   = false;
                 achievements.onJump();
             }
+            if (runnerDodgeCooldown > 0) runnerDodgeCooldown -= dt;
+            if (runnerDodgeTimer > 0) {
+                runnerDodgeTimer -= dt;
+                runnerY      = DODGE_Y;
+                runnerGround = false;
+                runnerDuck   = true;
+                runnerVY     = 0f;
+            } else if (input.runnerDodge && runnerGround && runnerDodgeCooldown <= 0) {
+                runnerDodgeTimer    = DODGE_DURATION;
+                runnerDodgeCooldown = DODGE_COOLDOWN;
+            }
             boolean wasDucking = runnerDuck;
-runnerDuck = input.runnerDuck && runnerGround;
-if (runnerDuck && !wasDucking) achievements.onDuck();
+            runnerDuck = input.runnerDuck && runnerGround;
+            if (runnerDuck && !wasDucking) achievements.onDuck();
         }
 
         if (!runnerGround) {
@@ -400,7 +418,7 @@ if (runnerDuck && !wasDucking) achievements.onDuck();
             Projectile p = pit.next();
             p.x += Projectile.SPEED * dt;
             if (p.x > W + 60) { pit.remove(); continue; }
-            if (runnerInvince <= 0 && p.bounds().intersects(runnerHitBox())) {
+            if (runnerInvince <= 0 && runnerDodgeTimer <= 0 && p.bounds().intersects(runnerHitBox())) {
                 pit.remove();
                 hitRunner();
                 if (state == State.GAME_OVER) return;
@@ -481,7 +499,8 @@ if (runnerDuck && !wasDucking) achievements.onDuck();
         og.setTransform(saved);   // hard restore — no floating point drift
 
         hud.drawHUD(og, runnerHits, chaserThrowCooldown, THROW_COOLDOWN,
-                timeLeft, TIME_LIMIT[di], elapsed, diff);
+                timeLeft, TIME_LIMIT[di], elapsed, diff,
+                runnerDodgeCooldown, DODGE_COOLDOWN);
                 achievements.drawToasts(og); // ← ADD THIS
 
 
@@ -542,14 +561,16 @@ if (runnerDuck && !wasDucking) achievements.onDuck();
 
         // Runner
         runner.x = runnerKnockX; runner.y = runnerY;
-        runner.onGround = runnerGround; runner.isDucking = runnerDuck;
+        runner.onGround = runnerGround; runner.isDucking = runnerDuck || runnerDodgeTimer > 0;
         runner.lives = 3 - runnerHits;
         if (runnerStun > 0) runner.applyStun(DT);
         runner.hitCooldown = runnerInvince;
         runner.cacheDt(DT); runner.update(DT, GROUND_Y, true);
 
         boolean flash = runnerInvince > 0 && runnerStun <= 0 && (int)(runnerInvince * 10) % 2 == 0;
-        if (!flash) drawPlayerScaled(runner, (int)runnerKnockX, (int)runnerY, runnerDuck, true, runnerStun > 0);
+        boolean showDuck = runnerDuck || runnerDodgeTimer > 0;
+        int runnerDrawY = runnerDodgeTimer > 0 ? (int)DODGE_Y : (int)runnerY;
+        if (!flash) drawPlayerScaled(runner, (int)runnerKnockX, runnerDrawY, showDuck, true, runnerStun > 0);
     }
 
     private void drawPlayerScaled(Player p, int cx, int groundY,
