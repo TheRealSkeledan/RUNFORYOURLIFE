@@ -538,7 +538,8 @@ achievementsButton.addActionListener(e -> {
     public Clip getMusicClip() { return musicClip; }
 
 private void onAchievements() {
-    Main.goToAchievements(frame);
+    // Pass the live clip so goToAchievements can stop it before switching panels
+    Main.goToAchievements(frame, musicClip);
 }    // This switches the panel over to your new screen instead of printing a stub!
     
     private void onCredits()      { System.out.println("Credits — not yet implemented"); }

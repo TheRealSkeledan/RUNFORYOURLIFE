@@ -25,6 +25,7 @@ public class Player {
     public int lives = 3; // Runner only
     public float stunTimer = 0;
     public float frozenTimer = 0;
+    public float attackTimer = 0f;   // counts down while playing the "attack" animation
     public boolean active = true;
 
     // --- Speed ---
@@ -86,6 +87,20 @@ public class Player {
     public void applyStun(float seconds)   { stunTimer   = Math.max(stunTimer,   seconds); }
     public void applyFreeze(float seconds) { frozenTimer = Math.max(frozenTimer, seconds); }
 
+    /**
+     * Triggers the "attack" animation for the given duration.
+     * While attackTimer > 0 the normal anim selection is overridden.
+     */
+    public void playAttack(float duration) {
+        attackTimer = duration;
+        // Force the animation state immediately
+        if (animations != null && animations.containsKey("attack")) {
+            currentAnim = "attack";
+            animFrame   = 0;
+            animTimer   = 0;
+        }
+    }
+
     public void loseLife() {
         if (isInvincible()) return;
         lives--;
@@ -97,6 +112,7 @@ public class Player {
         stunTimer   = Math.max(0, stunTimer   - dt);
         frozenTimer = Math.max(0, frozenTimer - dt);
         hitCooldown = Math.max(0, hitCooldown - dt);
+        attackTimer = Math.max(0, attackTimer - dt);
 
         if (isStunned() || isFrozen()) {
             applyGravity(dt, groundY);
@@ -105,6 +121,12 @@ public class Player {
         }
 
         applyGravity(dt, groundY);
+
+        // While attackTimer is running, lock to "attack" anim
+        if (attackTimer > 0) {
+            updateAnim(dt, "attack");
+            return;
+        }
 
         if (!canMoveHorizontally) { updateAnim(dt, "run");  return; }
 
@@ -162,9 +184,7 @@ public class Player {
     public void draw(Graphics2D g, float cameraX) {
         int drawX = (int)(x - cameraX);
         int drawY = (int)y;
-
-        // Invincibility flash — skip every other frame
-        if (isInvincible() && (int)(hitCooldown * 10) % 2 == 0) return;
+        // Flash is handled externally by GamePanel — do not skip here
 
         int w = getWidth();
         int h = getHeight();
@@ -186,9 +206,7 @@ public class Player {
     }
 
     public void draw(Graphics2D g, int drawX, int drawY, int drawW, int drawH) {
-
-        // Invincibility flash
-        if (isInvincible() && (int)(hitCooldown * 10) % 2 == 0) return;
+        // Flash is handled externally by GamePanel — do not skip here
 
         if (animations != null && animations.containsKey(currentAnim)) {
             BufferedImage[] frames = animations.get(currentAnim);

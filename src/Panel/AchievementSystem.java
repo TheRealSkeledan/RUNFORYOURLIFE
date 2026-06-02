@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.io.*;
+import java.nio.file.*;
 
 /**
  * AchievementSystem — tracks in-game milestones and renders animated
@@ -342,7 +344,10 @@ public class AchievementSystem {
     /** Returns the full catalogue of all achievements. */
     public Achievement[] getAllAchievements() { return ALL; }
 
-    /** Resets per-game counters but retains unlocked list for the session. */
+    /** Checks whether a specific achievement has been unlocked (persisted). */
+    public boolean isUnlocked(String id) { return unlocked.contains(id); }
+
+    /** Resets per-game counters but retains unlocked list (persisted cross-session). */
     public void resetForNewGame() {
         totalRunnerHits       = 0;
         totalProjectilesFired = 0;
@@ -355,7 +360,54 @@ public class AchievementSystem {
         runnerHitThisTick     = false;
         toastQueue.clear();
         activeToasts.clear();
-        // Note: unlocked list is kept intentionally — achievements persist per session.
-        // If you want achievements to reset on every new game, add: unlocked.clear();
+        // Unlocked list persists across games — loaded from / saved to JSON file.
+    }
+
+    // ── JSON Persistence ──────────────────────────────────────────────────────
+
+    private static final String SAVE_FILE = "achievements.json";
+
+    /**
+     * Save all unlocked achievement IDs to achievements.json.
+     * Format: {"unlocked":["id1","id2",...]}
+     */
+    public void save() {
+        try {
+            StringBuilder sb = new StringBuilder("{\"unlocked\":[");
+            for (int i = 0; i < unlocked.size(); i++) {
+                if (i > 0) sb.append(',');
+                sb.append('"').append(unlocked.get(i).replace("\"", "\\\"")).append('"');
+            }
+            sb.append("]}");
+            Files.writeString(Path.of(SAVE_FILE), sb.toString());
+        } catch (IOException e) {
+            System.err.println("[AchievementSystem] Failed to save: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Load unlocked achievement IDs from achievements.json.
+     * Silently skips if the file doesn't exist or is malformed.
+     */
+    public void load() {
+        try {
+            Path p = Path.of(SAVE_FILE);
+            if (!Files.exists(p)) return;
+            String json = Files.readString(p).trim();
+            // Simple hand-rolled parse: extract contents of "unlocked":[...]
+            int start = json.indexOf("[");
+            int end   = json.lastIndexOf("]");
+            if (start < 0 || end < 0 || end <= start) return;
+            String inner = json.substring(start + 1, end).trim();
+            if (inner.isEmpty()) return;
+            for (String token : inner.split(",")) {
+                String id = token.trim().replaceAll("\"", "");
+                if (!id.isEmpty() && !unlocked.contains(id)) {
+                    unlocked.add(id);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("[AchievementSystem] Failed to load: " + e.getMessage());
+        }
     }
 }

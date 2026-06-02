@@ -1,18 +1,45 @@
 package Panel;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 
 /**
  * HudRenderer — draws all 2-D overlay elements:
  *   hearts, throw bar, timer, mode label, controls hint,
  *   pause overlay, game-over overlay.
  *
- * Pass in the offscreen Graphics2D each frame; this class is stateless.
+ * Drop replacement PNGs at:
+ *   assets/ui/heart_full.png   — a full/active heart
+ *   assets/ui/heart_empty.png  — a spent/empty heart
+ * and they will be used automatically. Falls back to drawn shapes if absent.
  */
 public class HudRenderer {
 
     private static final int W = 1280;
     private static final int H = 720;
+
+    // ── Heart sprites (loaded once, shared across all instances) ──────────────
+    private static BufferedImage heartFull;
+    private static BufferedImage heartEmpty;
+    private static boolean heartSpritesLoaded = false;
+
+    private static void ensureHeartSprites() {
+        if (heartSpritesLoaded) return;
+        heartSpritesLoaded = true;
+        heartFull  = tryLoadImage("assets/images/ui/heart_full.png");
+        heartEmpty = tryLoadImage("assets/images/ui/heart_empty.png");
+    }
+
+    private static BufferedImage tryLoadImage(String path) {
+        try {
+            File f = new File(path);
+            if (f.exists()) return ImageIO.read(f);
+        } catch (IOException ignored) {}
+        return null;
+    }
 
     // ── Public entry points ───────────────────────────────────────────────────
 
@@ -20,7 +47,9 @@ public class HudRenderer {
                         float throwCooldownMax, float timeLeft, float timeLimitTotal,
                         float elapsed, GamePanel.Difficulty diff) {
 
-        // Hearts (top-right)
+        ensureHeartSprites();
+
+        // Hearts (top-right) — size 38 px each
         int hs = 38, hpad = 8;
         int startX = W - 3 * (hs + hpad) - 20;
         for (int i = 0; i < 3; i++)
@@ -115,7 +144,21 @@ public class HudRenderer {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Draws a heart at (x, y) with the given size.
+     * Uses heart_full.png / heart_empty.png if available, else draws programmatically.
+     */
     private void drawHeart(Graphics2D g, int x, int y, int size, boolean full) {
+        if (full && heartFull != null) {
+            g.drawImage(heartFull,  x, y, size, size, null);
+            return;
+        }
+        if (!full && heartEmpty != null) {
+            g.drawImage(heartEmpty, x, y, size, size, null);
+            return;
+        }
+
+        // Drawn fallback
         int half = size / 2;
         g.setColor(full ? new Color(220, 40, 60) : new Color(55, 55, 65));
         g.fillOval(x, y, half + 2, half + 2);

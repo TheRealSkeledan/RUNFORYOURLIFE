@@ -58,12 +58,12 @@ public class SelectionScreen extends JPanel implements MouseListener, MouseMotio
 The classic experience.\s
 Runner: run through the corridors and don't get caught
 Chaser: Make sure to slow the runner and catch them
-Runner has three chances, obstacles are easy to dodge, 2 minutes on the clock
+Runner has three chances, obstacles are easy to dodge, 2 minutes and 30 seconds on the clock
 A balanced experience... if you're fast enough""",
 
             """
 An equivalent to speedrun mode.
-Runner only has 1 chance, only 1:30 on the clock
+Runner only has 1 chance, only 2 minutes on the clock
 Obstacles do heavy push back to the chaser and are very fast
 Good luck.""",
 
@@ -209,7 +209,7 @@ Here I Come
             if (clickPulse <= 0f && launching) {
                 launching = false;
                 repaintTimer.stop();
-                Main.startGame(frame, selected.name());
+                Main.startGame(frame, selected.name(), musicClip);
             }
         }
 

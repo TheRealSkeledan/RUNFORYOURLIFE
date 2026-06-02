@@ -8,9 +8,13 @@ import javax.swing.*;
 import java.awt.*;
 
 public class Main {
-    /** Menu → AchievementsPanel. */
-/** MenuPanel → AchievementsPanel */
-    public static void goToAchievements(JFrame frame) {
+    /** MenuPanel → AchievementsPanel. Stops the menu music clip before switching. */
+    public static void goToAchievements(JFrame frame, javax.sound.sampled.Clip menuClip) {
+        // Stop menu music before leaving — avoids double-play when returning
+        if (menuClip != null) {
+            if (menuClip.isRunning()) menuClip.stop();
+            menuClip.close();
+        }
         AchievementsPanel achievementsPanel;
         try {
             achievementsPanel = new AchievementsPanel(frame);
@@ -60,10 +64,11 @@ public class Main {
     }
 
     /** SelectionScreen → GamePanel (called when Confirm is clicked). */
-    public static void startGame(JFrame frame, String mode) {
+    public static void startGame(JFrame frame, String mode, javax.sound.sampled.Clip menuClip) {
         GamePanel gamePanel;
         try {
-            gamePanel = new GamePanel(frame, mode);
+            // Pass the clip so GamePanel.tryLoadMusic() can stop it before starting game music
+            gamePanel = new GamePanel(frame, mode, menuClip);
         } catch (Exception e) {
             e.printStackTrace();
             return;
