@@ -541,14 +541,13 @@ if (timeLeft <= 0) {
 
     private void hitRunner() {
         achievements.onRunnerHit();
-        runnerHits++;
+
         int maxLives = (diff == Difficulty.HARDCORE) ? 1 : 3;
-        runner.lives  = maxLives - runnerHits;
+
         runnerStun    = STUN_DUR[di];
         runnerInvince = STUN_DUR[di] + 1.0f;
         runnerKnockX  = Math.max(chaserX + PW / 2f + 20f, runnerKnockX - 90f);
         runner.applyStun(STUN_DUR[di]);
-        if (runnerHits >= maxLives) endGame(false);
     }
 
     private void endGame(boolean runnerWins) {

@@ -45,8 +45,7 @@ public class HudRenderer {
 
     public void drawHUD(Graphics2D g, int runnerHits, float chaserThrowCooldown,
                         float throwCooldownMax, float timeLeft, float timeLimitTotal,
-                        float elapsed, GamePanel.Difficulty diff,
-                        float runnerDodgeCooldown, float dodgeCooldownMax) {
+                        float elapsed, GamePanel.Difficulty diff) {
 
         ensureHeartSprites();
 
@@ -101,13 +100,6 @@ public class HudRenderer {
         int dbarX = W - 220, dbarY = H - 60, dbarW = 180, dbarH = 12;
         g.setColor(new Color(60, 60, 60, 200));
         g.fillRoundRect(dbarX, dbarY, dbarW, dbarH, 6, 6);
-        float dr = 1f - Math.min(1f, runnerDodgeCooldown / dodgeCooldownMax);
-        g.setColor(dr >= 1f ? new Color(80, 255, 180) : new Color(40, 140, 100));
-        g.fillRoundRect(dbarX, dbarY, (int)(dbarW * dr), dbarH, 6, 6);
-        g.setFont(new Font("Arial", Font.BOLD, 13));
-        g.setColor(new Color(200, 200, 200, 180));
-        g.drawString(dr >= 1f ? "DODGE READY [→]" : "DODGE COOLDOWN", dbarX, dbarY - 4);
-        g.drawString("RUNNER", dbarX, dbarY + dbarH + 14);
 
 
         // Controls hint (first 5 s)
