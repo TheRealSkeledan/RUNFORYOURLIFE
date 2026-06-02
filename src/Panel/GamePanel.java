@@ -531,10 +531,10 @@ if (timeLeft <= 0) {
         int maxLives = (diff == Difficulty.HARDCORE) ? 1 : 3;
         runner.lives  = maxLives - runnerHits;
         runnerStun    = STUN_DUR[di];
-        runnerInvince = STUN_DUR[di] + 1.5f;  // longer invincibility on body hit
-        runnerKnockX  = RUNNER_X;              // reset runner to original start X
+        runnerInvince = STUN_DUR[di] + 1.5f;
+        runnerKnockX  = RUNNER_X;
         runner.applyStun(STUN_DUR[di]);
-        // Trigger chaser attack animation
+
         chaser.playAttack(ATTACK_ANIM_DUR);
         if (runnerHits >= maxLives) endGame(false);
     }
