@@ -75,7 +75,7 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     private static final float[] CHASER_KB  = {  60f,  80f,   50f  };
 
     private static final float WARN_TIME      = 2.0f;
-    private static final float THROW_COOLDOWN = 1.5f;
+    private static final float THROW_COOLDOWN = 5f;
 
     // ── Game state ────────────────────────────────────────────────────────────
     public enum State { PLAYING, PAUSED, GAME_OVER }
