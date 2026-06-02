@@ -1,6 +1,9 @@
 package Panel;
 
 import javax.imageio.ImageIO;
+
+import Panel.GamePanel.Difficulty;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -52,7 +55,7 @@ public class HudRenderer {
         // Hearts (top-right) — size 38 px each
         int hs = 38, hpad = 8;
         int startX = W - 3 * (hs + hpad) - 20;
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < ((diff == Difficulty.HARDCORE) ? 1 : 3); i++)
             drawHeart(g, startX + i * (hs + hpad), 16, hs, i >= runnerHits);
 
         g.setFont(new Font("Arial", Font.BOLD, 13));
