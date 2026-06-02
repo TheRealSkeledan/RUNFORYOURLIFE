@@ -12,6 +12,8 @@ public class InputHandler implements KeyListener {
     // ── Runner (arrow keys) ───────────────────────────────────────────────────
     public boolean runnerJump  = false;
     public boolean runnerDuck  = false;
+    public boolean runnerDodge = false;
+
 
     // ── Chaser (WASD + Space) ─────────────────────────────────────────────────
     public boolean chaserJump  = false;
@@ -43,6 +45,8 @@ public class InputHandler implements KeyListener {
             case KeyEvent.VK_P      -> pause       = true;
             case KeyEvent.VK_ENTER  -> confirm     = true;
             case KeyEvent.VK_ESCAPE -> menu        = true;
+            case KeyEvent.VK_RIGHT  -> runnerDodge  = true;
+
         }
     }
 
@@ -51,6 +55,7 @@ public class InputHandler implements KeyListener {
         switch (e.getKeyCode()) {
             case KeyEvent.VK_UP    -> runnerJump = false;
             case KeyEvent.VK_DOWN  -> runnerDuck = false;
+            case KeyEvent.VK_RIGHT  -> runnerDodge  = false;
             case KeyEvent.VK_W     -> chaserJump = false;
             case KeyEvent.VK_S     -> chaserDuck = false;
         }
