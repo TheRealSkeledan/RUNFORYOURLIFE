@@ -44,8 +44,8 @@ public class Obstacle {
     private static void ensureSprites() {
         if (spritesLoaded) return;
         spritesLoaded = true;
-        groundSprite = tryLoad("assets/obstacles/ground.png");
-        aerialSprite = tryLoad("assets/obstacles/aerial.png");
+        groundSprite = tryLoad("assets/images/obstacles/ground.png");
+        aerialSprite = tryLoad("assets/images/obstacles/aerial.png");
     }
 
     private static BufferedImage tryLoad(String path) {
