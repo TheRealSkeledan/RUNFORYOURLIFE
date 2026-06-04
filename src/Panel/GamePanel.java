@@ -66,7 +66,7 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
 
     private static final float[] OBS_SPEED  = { 340f, 430f, 270f };
     private static final float[] SPEED_RAMP = {   3f,   5f,  1.5f };
-    private static final float[] TIME_LIMIT = { 149f,  120f,  -1f  };
+    private static final float[] TIME_LIMIT = { 130f,  120f,  -1f  };
     private static final float[] STUN_DUR   = {  1.1f, 1.8f,  1.1f };
     // Obstacle pushback in pixels: [NORMAL, HARDCORE, HOTEL] for chaser and runner
     private static final float[] OBS_CHASER_KB = {  5f,  10f,   5f  };

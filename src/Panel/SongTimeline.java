@@ -39,8 +39,8 @@ public class SongTimeline {
     private static final int BAR_BREAK         = 34;   // bar 35
     private static final int BAR_FULL_FORCE    = 35;   // bar 36
     private static final int BAR_GREY          = 50;   // bar 51
-    private static final int BAR_COLOUR_RETURN = 63;   // bar 64
-    private static final int BAR_INTENSE2      = 71;   // bar 72
+    private static final int BAR_COLOUR_RETURN = 55;   // bar 64
+    private static final int BAR_INTENSE2      = 63;   // bar 72
     private static final int BAR_OUTRO         = 95;   // bar 96
 
     // ── Per-frame output values ───────────────────────────────────────────────
