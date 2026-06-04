@@ -110,19 +110,17 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     private float   chaserY             = GROUND_Y;
     private float   chaserVY            = 0f;
     private boolean chaserGround        = true;
-    private boolean chaserDuck          = false;
-    private float   chaserStun          = 0f;
-    private float   chaserX             = CHASER_X;
+    private boolean chaserDuck = false;
+    private float   chaserStun = 0f;
+    private float   chaserX = CHASER_X;
     private float   chaserThrowCooldown = 0f;
-    private static final float ATTACK_ANIM_DUR = 0.5f;  // seconds the attack anim plays
+    private static final float ATTACK_ANIM_DUR = 0.5f;
 
-    // ── Obstacles & warnings ──────────────────────────────────────────────────
     private record Warning(float y, Obstacle.Type type, float countdown) {}
     private final List<Obstacle> obstacles   = new ArrayList<>();
     private final List<Warning>  warnings    = new ArrayList<>();
     private float nextSpawnTimer = 1.8f;
 
-    // ── Projectiles ───────────────────────────────────────────────────────────
     private static class Projectile {
         float x, y;
         static final float SPEED = 680f;
@@ -133,37 +131,28 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     }
     private final List<Projectile> projectiles = new ArrayList<>();
 
-    // ── FPS Counter ──────────────────────────────────────────────────────────────
     private int fps = 0;
     private int frames = 0;
     private long lastFpsTime = System.currentTimeMillis();
 
-    // ── Delegates ─────────────────────────────────────────────────────────────
     private final InputHandler       input    = new InputHandler();
     private final BackgroundRenderer bgr;
     private final HudRenderer        hud      = new HudRenderer();
     private final BeatClock          clock    = new BeatClock(160f);
     private final SongTimeline       timeline = new SongTimeline();
 
-    // ── Rendering — ping-pong double buffer ───────────────────────────────────
-    // The game-loop thread always writes to backBuffer/og.
-    // When a frame is complete, frontBuffer is swapped atomically via a volatile
-    // reference so paintComponent (EDT) never reads a half-written frame.
     private final BufferedImage bufferA;
     private final BufferedImage bufferB;
-    private final Graphics2D    gA;
-    private final Graphics2D    gB;
-    private BufferedImage backBuffer;   // game-loop thread writes here
-    private Graphics2D    og;           // always points at backBuffer's G2D
-    private volatile BufferedImage frontBuffer;  // EDT reads this — volatile for visibility
+    private final Graphics2D gA;
+    private final Graphics2D gB;
+    private BufferedImage backBuffer;
+    private Graphics2D og;
+    private volatile BufferedImage frontBuffer;
 
-    // ── Misc ──────────────────────────────────────────────────────────────────
     @SuppressWarnings("unused") private Music bgm;
     private final Clip   menuMusicClip;
     private final JFrame frame;
     private final Random rng = new Random();
-
-    // ── Constructors ──────────────────────────────────────────────────────────
 
     public GamePanel(JFrame frame, String modeName, Clip menuClip) throws Exception {
         this.frame         = frame;
@@ -179,8 +168,6 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         setFocusable(true);
         addKeyListener(input);
 
-        // Guarantee achievements are saved even if the window is closed mid-game
-        // (i.e. before endGame() is ever called).
         Runtime.getRuntime().addShutdownHook(new Thread(achievements::save, "AchievementSaveHook"));
 
         // Allocate both ping-pong buffers with identical settings
@@ -194,7 +181,7 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
             g2.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_SPEED);
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,   RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         }
-        // Start: game loop writes to bufferA, EDT reads bufferB (initially black)
+
         backBuffer  = bufferA;
         og          = gA;
         frontBuffer = bufferB;
@@ -202,11 +189,10 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         bgr = new BackgroundRenderer(rng);
         bgr.init();
 
-        achievements.load();   // Load persisted achievements from JSON
+        achievements.load();
         tryLoadMusic();
         resetWorld();
 
-        // High-resolution game loop thread — more stable than Swing Timer
         Thread gameLoop = new Thread(() -> {
             long lastTime = System.nanoTime();
             while (true) {
@@ -217,9 +203,7 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
                     handleInput();
                     if (state == State.PLAYING) update(DT);
                     render();
-                    // Atomic buffer swap: promote the just-finished back buffer to front.
-                    // paintComponent only ever reads frontBuffer (volatile), so it will
-                    // never see a partially-written frame regardless of EDT scheduling.
+
                     frontBuffer = backBuffer;
                     backBuffer  = (backBuffer == bufferA) ? bufferB : bufferA;
                     og          = (backBuffer == bufferA) ? gA      : gB;
@@ -233,7 +217,6 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
                     }
                     input.consumeSingleFrameActions();
                 } else {
-                    // Yield to avoid 100% CPU spin
                     Thread.yield();
                 }
             }
@@ -242,14 +225,11 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         gameLoop.start();
     }
 
-    /** Backwards-compatible constructor (no menu clip). */
     public GamePanel(JFrame frame, String modeName) throws Exception {
         this(frame, modeName, null);
     }
 
     @Override public Dimension getPreferredSize() { return new Dimension(W, H); }
-
-    // ── Music ─────────────────────────────────────────────────────────────────
 
     private void tryLoadMusic() {
         if (menuMusicClip != null) {
@@ -266,8 +246,6 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
             ex.printStackTrace();
         }
     }
-
-    // ── World reset ───────────────────────────────────────────────────────────
 
     private void resetWorld() {
         elapsed  = 0f;
@@ -286,13 +264,13 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         nextSpawnTimer = 1.8f;
 
         bgr.reset();
-        float barDur = 60f / 160f * 4f;   // 1.5 s per bar at 160 BPM
+        float barDur = 60f / 160f * 4f;
         clock.reset(AUDIO_LATENCY + BEAT_OFFSET_BARS * barDur);
         timeline.reset();
 
         runner = new Player("runner", true,  runnerKnockX, runnerY, OBS_SPEED[di]);
-        chaser = new Player("chaser", false, chaserX,      chaserY, OBS_SPEED[di]);
-        // Hardcore: runner has only 1 life; Normal/Hotel: 3 lives
+        chaser = new Player("chaser", false, chaserX, chaserY, OBS_SPEED[di]);
+
         runner.lives = (diff == Difficulty.HARDCORE) ? 1 : 3;
 
         state = State.PLAYING;
@@ -300,17 +278,12 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
 
     }
 
-    // ── Main loop ─────────────────────────────────────────────────────────────
-
     @Override
     public void actionPerformed(ActionEvent e) {
-        // Intentionally empty — the game loop thread drives all updates.
+        // [Leave this empty]
     }
 
-    // ── Input processing ──────────────────────────────────────────────────────
-
     private void handleInput() {
-        // Pause toggle
         if (input.pause) {
             if      (state == State.PLAYING) { state = State.PAUSED; }
             else if (state == State.PAUSED)  { state = State.PLAYING; }
@@ -318,7 +291,6 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         }
         if (state == State.PAUSED) return;
 
-        // Game-over screen actions
         if (state == State.GAME_OVER) {
             if (input.confirm) resetWorld();
             if (input.menu)    Main.Main.goToMenu(frame);
@@ -326,33 +298,30 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         }
     }
 
-    // ── Update ────────────────────────────────────────────────────────────────
-
     private void update(float dt) {
         elapsed += dt;
         achievements.update(dt);
-achievements.tick(elapsed, diff);
+        achievements.tick(elapsed, diff);
         clock.update(dt);
         timeline.update(clock, dt);
 
-        // Timer
         if (TIME_LIMIT[di] > 0) {
             timeLeft -= dt;
-if (timeLeft <= 0) {
-    timeLeft = 0;
-    achievements.onTimerExpired(); // ← ADD THIS
-    endGame(true);
-    return;
-}        }
 
-        // Speed ramp: accelerate during intense sections, recover during calm ones
+            if (timeLeft <= 0) {
+                timeLeft = 0;
+                achievements.onTimerExpired();
+                endGame(true);
+                return;
+            }
+        }
+
         float targetSpeed = timeline.isIntenseSection()
                 ? OBS_SPEED[di] + SPEED_RAMP[di] * elapsed
                 : OBS_SPEED[di];
-        // Smooth transition so speed doesn't snap
+
         obsSpeed += (targetSpeed - obsSpeed) * 2.0f * dt;
 
-        // Cool-down timers
         runnerStun          = Math.max(0, runnerStun          - dt);
         runnerInvince       = Math.max(0, runnerInvince       - dt);
         chaserStun          = Math.max(0, chaserStun          - dt);
@@ -375,9 +344,8 @@ if (timeLeft <= 0) {
                 achievements.onJump();
             }
             boolean wasDucking = runnerDuck;
-            // Duck: pressing starts 2s timer; releasing key ends early; timer expiry requires new press
+
             if (!input.runnerDuck) {
-                // Key released — reset consumed flag so next press works
                 runnerDuckConsumed = false;
             }
             if (input.runnerDuck && runnerGround && !runnerDuckConsumed) {
@@ -390,7 +358,7 @@ if (timeLeft <= 0) {
                     if (runnerDuckTimer <= 0) {
                         runnerDuck = false;
                         runnerDuckTimer = 0f;
-                        runnerDuckConsumed = true;  // must release key before ducking again
+                        runnerDuckConsumed = true;
                     }
                 }
             } else if (!input.runnerDuck || !runnerGround) {
@@ -405,8 +373,6 @@ if (timeLeft <= 0) {
             runnerVY     = res[1];
             runnerGround = (runnerY >= GROUND_Y);
         }
-
-        // runnerKnockX is NOT recovered — it stays wherever knockback left it
     }
 
     private void updateChaser(float dt) {
@@ -438,10 +404,9 @@ if (timeLeft <= 0) {
             }
 
             if (input.chaserThrow && chaserThrowCooldown <= 0) {
-                // Spawn projectile at chaser's chest height based on current position
                 int chaserDrawH = chaserDuck ? 180 : 360;
-                float projX = chaserX + (chaserDuck ? 150f : 180f); // right side of chaser
-                float projY = chaserY - chaserDrawH * 0.55f;         // chest/arm height
+                float projX = chaserX + (chaserDuck ? 150f : 180f);
+                float projY = chaserY - chaserDrawH * 0.55f;
                 projectiles.add(new Projectile(projX, projY));
                 chaserThrowCooldown = THROW_COOLDOWN;
                 achievements.onProjectileFired();
@@ -455,28 +420,23 @@ if (timeLeft <= 0) {
             chaserGround = (chaserY >= GROUND_Y);
         }
 
-        // chaserX is NOT recovered — it stays wherever knockback left it
         if (chaserX + PW / 2f < 0) { endGame(true); }
     }
 
     private void updateObstacles(float dt) {
-        // Spawn warnings
         nextSpawnTimer -= dt;
         if (nextSpawnTimer <= 0) {
             Obstacle.Type type = rng.nextBoolean() ? Obstacle.Type.GROUND : Obstacle.Type.AERIAL;
-            // Warning indicators sit near where the obstacle will appear
+
             float y = (type == Obstacle.Type.GROUND) ? GROUND_Y - Obstacle.GROUND_H / 2f : Obstacle.AERIAL_BOTTOM_Y - Obstacle.AERIAL_H / 2f;
             warnings.add(new Warning(y, type, WARN_TIME));
             nextSpawnTimer = 1.4f + rng.nextFloat() * 1.2f;
         }
 
-        // Promote warnings → obstacles
         List<Warning> keep = new ArrayList<>();
         for (Warning w : warnings) {
             float nc = w.countdown() - dt;
             if (nc <= 0) {
-                // Obstacle constructor sets its own Y correctly (ground sits on floor,
-                // aerial hangs at Obstacle.AERIAL_BOTTOM_Y = 400 from screen top)
                 Obstacle obs = new Obstacle(W + 180, GROUND_Y, w.type());
                 obstacles.add(obs);
             } else {
@@ -486,7 +446,6 @@ if (timeLeft <= 0) {
         warnings.clear();
         warnings.addAll(keep);
 
-        // Move obstacles and check collisions
         Iterator<Obstacle> it = obstacles.iterator();
         while (it.hasNext()) {
             Obstacle obs = it.next();
@@ -511,8 +470,6 @@ if (timeLeft <= 0) {
         }
     }
 
-    // ── Collision helpers ─────────────────────────────────────────────────────
-
     private Rectangle runnerHitBox() {
         int rh = runnerDuck ? DUCK_H : PH, rw = PW - 30;
         return new Rectangle((int)runnerKnockX - rw/2, (int)runnerY - rh, rw, rh);
@@ -526,10 +483,9 @@ if (timeLeft <= 0) {
     private void handleObstacleCollisions(Obstacle obs) {
         Rectangle obsR = obs.getCollisionBounds();
 
-        // GROUND obstacles (bottom) → jump to dodge | AERIAL obstacles (top) → duck to dodge
         if (runnerHitBox().intersects(obsR)) {
-            boolean safe = (obs.type == Obstacle.Type.GROUND && !runnerGround)  // jumped over
-                    || (obs.type == Obstacle.Type.AERIAL && runnerDuck);          // ducked under
+            boolean safe = (obs.type == Obstacle.Type.GROUND && !runnerGround)
+                    || (obs.type == Obstacle.Type.AERIAL && runnerDuck);
             if (!safe && state != State.GAME_OVER) {
                 runnerKnockX -= OBS_RUNNER_KB[di];
                 runner.applyStun(0.3f);
@@ -538,8 +494,8 @@ if (timeLeft <= 0) {
         }
 
         if (chaserStun <= 0 && chaserHitBox().intersects(obsR)) {
-            boolean safe = (obs.type == Obstacle.Type.GROUND && !chaserGround)  // jumped over
-                    || (obs.type == Obstacle.Type.AERIAL && chaserDuck);          // ducked under
+            boolean safe = (obs.type == Obstacle.Type.GROUND && !chaserGround)
+                    || (obs.type == Obstacle.Type.AERIAL && chaserDuck);
             if (!safe) {
                 chaserStun = STUN_DUR[di];
                 chaserX   -= OBS_CHASER_KB[di];
@@ -548,21 +504,15 @@ if (timeLeft <= 0) {
         }
     }
 
-    /**
-     * Called every tick. If the chaser body-touches the runner (and runner is
-     * not invincible), the runner loses a life, resets to their original X,
-     * and the chaser plays an "attack" animation.
-     */
     private void checkChaserRunnerContact() {
         if (state == State.GAME_OVER) return;
-        if (runnerInvince > 0) return;   // runner is invincible — no hit
-        if (chaserStun > 0) return;      // chaser is stunned — can't attack
+        if (runnerInvince > 0) return;
+        if (chaserStun > 0) return;
         if (chaserHitBox().intersects(runnerHitBox())) {
             hitRunnerByContact();
         }
     }
 
-    /** Runner touched by chaser directly — loses a life and resets to original X. */
     private void hitRunnerByContact() {
         achievements.onRunnerHit();
         runnerHits++;
@@ -590,22 +540,19 @@ if (timeLeft <= 0) {
 
     private void endGame(boolean runnerWins) {
         if (runnerWins) {
-        achievements.onRunnerWin(elapsed, diff); // ← ADD THIS
+        achievements.onRunnerWin(elapsed, diff);
     } else {
-        achievements.onChaserWin(diff);          // ← ADD THIS
+        achievements.onChaserWin(diff);
     }
         runnerWon = runnerWins;
         state     = State.GAME_OVER;
-        achievements.save();   // Persist unlocked achievements to JSON
+        achievements.save();
     }
-
-    // ── Render ────────────────────────────────────────────────────────────────
 
     private void render() {
         og.setColor(Color.BLACK);
         og.fillRect(0, 0, W, H);
 
-        // Save transform, apply shake, draw world, then restore — prevents drift
         java.awt.geom.AffineTransform saved = og.getTransform();
         og.translate((int) timeline.shakeX, (int) timeline.shakeY);
         bgr.drawBackground(og, obsSpeed, DT, diff, clock, timeline);
@@ -620,8 +567,6 @@ if (timeLeft <= 0) {
                 timeLeft, TIME_LIMIT[di], elapsed, diff);
                 achievements.drawToasts(og); // ← ADD THIS
 
-
-
         og.setColor(Color.WHITE);
         og.setFont(new Font("Consolas", Font.BOLD, 24));
         og.drawString("FPS: " + fps, 20, 40);
@@ -629,7 +574,6 @@ if (timeLeft <= 0) {
         if (state == State.PAUSED)    hud.drawPauseOverlay(og);
         if (state == State.GAME_OVER) hud.drawGameOverOverlay(og, runnerWon, diff, elapsed, timeLeft);
 
-        // Greyscale post-process — fast int-array path, only active during grey sections
         bgr.applyGreyscale(backBuffer, og, timeline.grey);
     }
 
@@ -669,14 +613,12 @@ if (timeLeft <= 0) {
     }
 
     private void drawPlayers() {
-        // Chaser
         chaser.x = chaserX; chaser.y = chaserY;
         chaser.onGround = chaserGround; chaser.isDucking = chaserDuck;
         if (chaserStun > 0) chaser.applyStun(DT);
         chaser.cacheDt(DT); chaser.update(DT, GROUND_Y, true);
         drawPlayerScaled(chaser, (int)chaserX,      (int)chaserY, chaserDuck, false, chaserStun > 0);
 
-        // Runner
         runner.x = runnerKnockX; runner.y = runnerY;
         runner.onGround = runnerGround; runner.isDucking = runnerDuck;
         runner.lives = ((diff == Difficulty.HARDCORE) ? 1 : 3) - runnerHits;
@@ -690,33 +632,19 @@ if (timeLeft <= 0) {
 
     private void drawPlayerScaled(Player p, int cx, int groundY,
                                   boolean ducking, boolean isRunner, boolean stunned) {
-        // Width is ALWAYS the standing width — the duck frame uses the same horizontal
-        // space as the standing frame (the character crouches down, not sideways).
-        // Changing drawW for ducking squishes the sprite horizontally; don't do it.
         int drawW = isRunner ? (Player.STAND_W + 100) : (Player.STAND_W + 140);
 
-        // Height changes per pose: duck = DUCK_H (shorter), stand = full height.
-        // Because drawY = groundY - drawH, a shorter drawH means the top of the
-        // sprite is lower → player visually sinks into the ground when ducking.
         int drawH = ducking ? Player.DUCK_H : (isRunner ? 340 : 360);
 
-        int drawX = cx - drawW / 2;   // X centre unchanged regardless of pose
-        int drawY = groundY - drawH;  // feet always anchored at groundY
+        int drawX = cx - drawW / 2;
+        int drawY = groundY - drawH;
 
         p.draw(og, drawX, drawY, drawW, drawH);
         og.setColor(Color.WHITE);
     }
 
-    // ── Swing paint ───────────────────────────────────────────────────────────
-
     @Override
     protected void paintComponent(Graphics g) {
-        // Do NOT call super.paintComponent — that would clear the panel to black
-        // before we draw the offscreen image, causing a visible black flash.
-        // Read frontBuffer: the last fully-rendered frame, swapped atomically
-        // by the game loop after every render() call. The volatile write on the
-        // game thread and this volatile read on the EDT form a happens-before
-        // edge, so we are guaranteed to see a complete, non-torn frame.
         BufferedImage frame = frontBuffer;
         if (frame == null) return;
         int   pw    = getWidth(), ph = getHeight();
