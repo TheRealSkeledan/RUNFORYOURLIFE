@@ -9,69 +9,34 @@ import java.util.Queue;
 import java.io.*;
 import java.nio.file.*;
 
-/**
- * AchievementSystem — tracks in-game milestones and renders animated
- * toast notifications on-screen.
- *
- * ── How to use ────────────────────────────────────────────────────────────────
- *  1. Add a field in GamePanel:
- *       private final AchievementSystem achievements = new AchievementSystem();
- *
- *  2. Call update every tick (inside GamePanel.update):
- *       achievements.update(DT);
- *
- *  3. Feed stats each tick (inside GamePanel.update, after updating timers):
- *       achievements.tick(elapsed, runnerHits, runnerDuck, runnerGround,
- *                         chaserThrowCooldown, THROW_COOLDOWN,
- *                         projectiles.size(), obstacles.size(), diff);
- *
- *  4. Notify specific events where they happen in GamePanel:
- *       achievements.onRunnerHit();          // inside hitRunner()
- *       achievements.onProjectileFired();    // inside updateChaser() when throw fires
- *       achievements.onObstacleAvoided();    // inside updateObstacles() when obs leaves screen
- *       achievements.onRunnerWin(elapsed);   // inside endGame(true)
- *       achievements.onChaserWin();          // inside endGame(false)
- *       achievements.onJump();               // inside updateRunner() on jump
- *       achievements.onDuck();               // inside updateRunner() on duck
- *
- *  5. Draw toasts last in GamePanel.render() (after HUD, before greyscale):
- *       achievements.drawToasts(og);
- */
 public class AchievementSystem {
-
-    // ── Screen constants (must match GamePanel) ───────────────────────────────
     private static final int W = 1280;
     private static final int H = 720;
 
-    // ── Toast display ─────────────────────────────────────────────────────────
-    private static final float TOAST_DURATION  = 3.5f;   // seconds on screen
-    private static final float TOAST_SLIDE_IN  = 0.25f;  // slide-in time
-    private static final float TOAST_SLIDE_OUT = 0.4f;   // fade-out time
+    private static final float TOAST_DURATION  = 3.5f;
+    private static final float TOAST_SLIDE_IN  = 0.25f;
+    private static final float TOAST_SLIDE_OUT = 0.4f;
     private static final int   TOAST_W         = 320;
     private static final int   TOAST_H         = 68;
     private static final int   TOAST_MARGIN    = 14;
 
-    // ── Counters & flags ──────────────────────────────────────────────────────
-    private int   totalRunnerHits       = 0;   // hits landed on runner this game
+    private int   totalRunnerHits       = 0;
     private int   totalProjectilesFired = 0;
+    private int   totalProjectileHits   = 0;   // projectiles that actually landed on runner
     private int   totalObstaclesAvoided = 0;
     private int   totalJumps            = 0;
     private int   totalDucks            = 0;
     private float maxSurvivalTime       = 0f;
-    private float consecutiveDodgeTimer = 0f;   // seconds since last hit
-    private int   consecutiveDodges     = 0;    // obstacles avoided without getting hit
+    private float consecutiveDodgeTimer = 0f;
+    private int   consecutiveDodges     = 0;
     private boolean runnerHitThisTick   = false;
 
-    // ── Unlocked achievement IDs ──────────────────────────────────────────────
     private final List<String> unlocked = new ArrayList<>();
 
-    // ── Toast queue ───────────────────────────────────────────────────────────
     private final Queue<Achievement> toastQueue = new LinkedList<>();
     private final List<ActiveToast>  activeToasts = new ArrayList<>();
 
-    // ── All defined achievements ──────────────────────────────────────────────
     private final Achievement[] ALL = {
-        // ── Runner achievements ────────────────────────────────────────────
         ach("first_blood",    "First Blood",       "Runner takes the first hit",
                 Tier.BRONZE,  "\u2764"),
         ach("three_strikes",  "Three Strikes",     "Runner caught — 3 hits landed",
@@ -86,36 +51,23 @@ public class AchievementSystem {
                 Tier.GOLD,    "\uD83D\uDC8E"),
         ach("high_jumper",    "High Jumper",        "Jump 20 times in one game",
                 Tier.BRONZE,  "\uD83D\uDD1D"),
-        ach("limbo_master",   "Limbo Master",       "Duck 15 times in one game",
-                Tier.BRONZE,  "\uD83E\uDD47"),
         ach("close_call",     "Close Call",         "Dodge 5 obstacles in a row",
                 Tier.SILVER,  "\uD83D\uDCA8"),
         ach("matrix",         "The Matrix",         "Dodge 15 obstacles in a row",
                 Tier.GOLD,    "\uD83D\uDD73"),
-
-        // ── Chaser achievements ────────────────────────────────────────────
         ach("deadeye",        "Dead Eye",           "Land 3 projectile hits",
                 Tier.SILVER,  "\uD83D\uDCA5"),
         ach("rapid_fire",     "Rapid Fire",         "Fire 10 projectiles in one game",
                 Tier.BRONZE,  "\uD83D\uDD25"),
         ach("marksman",       "Marksman",           "Fire 25 projectiles in one game",
                 Tier.SILVER,  "\uD83C\uDFF9"),
-
-        // ── Difficulty-based ───────────────────────────────────────────────
         ach("hardcore_clear", "Hardcore Cleared",   "Win on HARDCORE difficulty",
                 Tier.GOLD,    "\uD83D\uDC80"),
-        ach("hotel_escape",   "Checked Out",        "Runner escapes the Hotel",
-                Tier.GOLD,    "\uD83C\uDFE8"),
-        ach("hotel_caught",   "Room Service",       "Chaser catches the runner in Hotel",
-                Tier.GOLD,    "\uD83D\uDD14"),
     };
 
-    /** Clamps a 0-255 alpha int so Color never throws. */
     private static int a(float alpha, int max) {
         return Math.max(0, Math.min(max, (int)(max * alpha)));
     }
-
-    // ── Achievement definition ────────────────────────────────────────────────
 
     public enum Tier { BRONZE, SILVER, GOLD }
 
@@ -133,15 +85,12 @@ public class AchievementSystem {
         return new Achievement(id, title, desc, tier, icon);
     }
 
-    // ── Active toast ─────────────────────────────────────────────────────────
-
     private static class ActiveToast {
         final Achievement ach;
-        float life;       // counts up to TOAST_DURATION
-        int   slot;       // vertical slot index (0 = top)
+        float life;
+        int   slot;
         ActiveToast(Achievement a, int slot) { ach = a; life = 0f; this.slot = slot; }
 
-        /** 0→1→1→0 alpha over the toast lifetime. */
         float alpha() {
             if (life < TOAST_SLIDE_IN)
                 return life / TOAST_SLIDE_IN;
@@ -150,20 +99,16 @@ public class AchievementSystem {
             return 1f;
         }
 
-        /** X offset for slide-in from the right edge. */
         int slideX() {
             if (life < TOAST_SLIDE_IN) {
                 float t = life / TOAST_SLIDE_IN;
-                float ease = 1f - (1f - t) * (1f - t);   // ease-out quad
+                float ease = 1f - (1f - t) * (1f - t);
                 return (int)((1f - ease) * (TOAST_W + 20));
             }
             return 0;
         }
     }
 
-    // ── Public event hooks ────────────────────────────────────────────────────
-
-    /** Call when the runner takes a hit. */
     public void onRunnerHit() {
         totalRunnerHits++;
         consecutiveDodges     = 0;
@@ -173,14 +118,18 @@ public class AchievementSystem {
         if (totalRunnerHits >= 3) tryUnlock("three_strikes");
     }
 
-    /** Call when the chaser fires a projectile. */
     public void onProjectileFired() {
         totalProjectilesFired++;
         if (totalProjectilesFired >= 10) tryUnlock("rapid_fire");
         if (totalProjectilesFired >= 25) tryUnlock("marksman");
     }
 
-    /** Call when an obstacle scrolls off screen (i.e., runner successfully passed it). */
+    /** Called when a projectile actually hits the runner (not just fired). */
+    public void onProjectileHit() {
+        totalProjectileHits++;
+        if (totalProjectileHits >= 3) tryUnlock("deadeye");
+    }
+
     public void onObstacleAvoided() {
         totalObstaclesAvoided++;
         consecutiveDodges++;
@@ -188,19 +137,15 @@ public class AchievementSystem {
         if (consecutiveDodges >= 15) tryUnlock("matrix");
     }
 
-    /** Call when the runner jumps. */
     public void onJump() {
         totalJumps++;
         if (totalJumps >= 20) tryUnlock("high_jumper");
     }
 
-    /** Call when the runner ducks. */
     public void onDuck() {
         totalDucks++;
-        if (totalDucks >= 15) tryUnlock("limbo_master");
     }
 
-    /** Call inside endGame(true) — runner won. */
     public void onRunnerWin(float elapsed, GamePanel.Difficulty diff) {
         // Check untouchable (survived with 0 hits)
         if (totalRunnerHits == 0) tryUnlock("untouchable");
@@ -208,25 +153,19 @@ public class AchievementSystem {
         if (diff == GamePanel.Difficulty.HOTEL)    tryUnlock("hotel_escape");
     }
 
-    /** Call inside endGame(false) — chaser won. */
     public void onChaserWin(GamePanel.Difficulty diff) {
         if (totalRunnerHits >= 3) tryUnlock("three_strikes");
         if (diff == GamePanel.Difficulty.HOTEL) tryUnlock("hotel_caught");
     }
 
-    /** Call every tick from GamePanel.update() to track time-based achievements. */
     public void tick(float elapsed, GamePanel.Difficulty diff) {
         if (elapsed >= 30f)  tryUnlock("speedrunner");
         if (elapsed >= 90f)  tryUnlock("marathoner");
-        // eternal_runner is awarded in onRunnerWin when time runs out naturally
     }
 
-    /** Unlock eternal_runner explicitly when the timer expires. */
     public void onTimerExpired() {
         tryUnlock("eternal_runner");
     }
-
-    // ── Internal unlock logic ─────────────────────────────────────────────────
 
     private void tryUnlock(String id) {
         if (unlocked.contains(id)) return;
@@ -245,31 +184,20 @@ public class AchievementSystem {
         toastQueue.add(a);
     }
 
-    // ── Update (call every tick) ──────────────────────────────────────────────
-
     public void update(float dt) {
         runnerHitThisTick = false;
 
-        // Advance active toasts
         activeToasts.removeIf(t -> t.life >= TOAST_DURATION);
         for (ActiveToast t : activeToasts) t.life += dt;
 
-        // Re-assign slots compactly
         for (int i = 0; i < activeToasts.size(); i++) activeToasts.get(i).slot = i;
 
-        // Promote from queue if slot available
         if (!toastQueue.isEmpty() && activeToasts.size() < 4) {
             Achievement next = toastQueue.poll();
             activeToasts.add(new ActiveToast(next, activeToasts.size()));
         }
     }
 
-    // ── Draw toasts ───────────────────────────────────────────────────────────
-
-    /**
-     * Draw all active achievement toast notifications.
-     * Call this inside GamePanel.render(), after the HUD but before greyscale.
-     */
     public void drawToasts(Graphics2D g) {
         if (activeToasts.isEmpty()) return;
 
@@ -290,67 +218,53 @@ public class AchievementSystem {
         int x = W - TOAST_W - 20 + slideX;
         int y = H - (toast.slot + 1) * (TOAST_H + TOAST_MARGIN) - 20;
 
-        // ── Panel shadow ──────────────────────────────────────────────────────
         g.setColor(new Color(0, 0, 0, a(alpha, 100)));
         g.fill(new RoundRectangle2D.Float(x + 4, y + 4, TOAST_W, TOAST_H, 14, 14));
 
-        // ── Tier accent colour ────────────────────────────────────────────────
         Color accent = switch (toast.ach.tier) {
             case BRONZE -> new Color(205, 127,  50);
             case SILVER -> new Color(180, 180, 200);
             case GOLD   -> new Color(255, 200,  40);
         };
 
-        // ── Background panel ──────────────────────────────────────────────────
         g.setColor(new Color(20, 15, 30, a(alpha, 230)));
         g.fill(new RoundRectangle2D.Float(x, y, TOAST_W, TOAST_H, 14, 14));
 
-        // ── Left accent stripe ────────────────────────────────────────────────
         g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), a(alpha, 220)));
         g.fill(new RoundRectangle2D.Float(x, y, 6, TOAST_H, 6, 6));
 
-        // ── Border ────────────────────────────────────────────────────────────
         g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), a(alpha, 90)));
         g.setStroke(new BasicStroke(1.2f));
         g.draw(new RoundRectangle2D.Float(x, y, TOAST_W, TOAST_H, 14, 14));
         g.setStroke(new BasicStroke(1f));
 
-        // ── "ACHIEVEMENT UNLOCKED" label ──────────────────────────────────────
         g.setFont(new Font("Arial", Font.BOLD, 10));
         g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), a(alpha, 200)));
         g.drawString("ACHIEVEMENT UNLOCKED", x + 14, y + 16);
 
-        // ── Icon ──────────────────────────────────────────────────────────────
         g.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 26));
         g.setColor(new Color(255, 255, 255, a(alpha, 220)));
         g.drawString(toast.ach.icon, x + 12, y + TOAST_H - 12);
 
-        // ── Title ─────────────────────────────────────────────────────────────
         g.setFont(new Font("Arial", Font.BOLD, 15));
         g.setColor(new Color(255, 255, 255, a(alpha, 240)));
         g.drawString(toast.ach.title, x + 48, y + TOAST_H - 26);
 
-        // ── Description ───────────────────────────────────────────────────────
         g.setFont(new Font("Arial", Font.PLAIN, 11));
         g.setColor(new Color(180, 170, 200, a(alpha, 190)));
         g.drawString(toast.ach.description, x + 48, y + TOAST_H - 12);
     }
 
-    // ── Accessors ─────────────────────────────────────────────────────────────
-
-    /** Returns IDs of all achievements unlocked this session. */
     public List<String> getUnlocked() { return new ArrayList<>(unlocked); }
 
-    /** Returns the full catalogue of all achievements. */
     public Achievement[] getAllAchievements() { return ALL; }
 
-    /** Checks whether a specific achievement has been unlocked (persisted). */
     public boolean isUnlocked(String id) { return unlocked.contains(id); }
 
-    /** Resets per-game counters but retains unlocked list (persisted cross-session). */
     public void resetForNewGame() {
         totalRunnerHits       = 0;
         totalProjectilesFired = 0;
+        totalProjectileHits   = 0;
         totalObstaclesAvoided = 0;
         totalJumps            = 0;
         totalDucks            = 0;
@@ -360,17 +274,10 @@ public class AchievementSystem {
         runnerHitThisTick     = false;
         toastQueue.clear();
         activeToasts.clear();
-        // Unlocked list persists across games — loaded from / saved to JSON file.
     }
-
-    // ── JSON Persistence ──────────────────────────────────────────────────────
 
     private static final String SAVE_FILE = "achievements.json";
 
-    /**
-     * Save all unlocked achievement IDs to achievements.json.
-     * Format: {"unlocked":["id1","id2",...]}
-     */
     public void save() {
         try {
             StringBuilder sb = new StringBuilder("{\"unlocked\":[");
@@ -385,16 +292,12 @@ public class AchievementSystem {
         }
     }
 
-    /**
-     * Load unlocked achievement IDs from achievements.json.
-     * Silently skips if the file doesn't exist or is malformed.
-     */
     public void load() {
         try {
             Path p = Path.of(SAVE_FILE);
             if (!Files.exists(p)) return;
             String json = Files.readString(p).trim();
-            // Simple hand-rolled parse: extract contents of "unlocked":[...]
+
             int start = json.indexOf("[");
             int end   = json.lastIndexOf("]");
             if (start < 0 || end < 0 || end <= start) return;

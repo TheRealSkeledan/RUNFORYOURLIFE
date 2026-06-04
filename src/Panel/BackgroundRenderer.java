@@ -43,6 +43,10 @@ public class BackgroundRenderer {
     private float breakFlash = 0f;
 
     // ── Greyscale scratch buffer ──────────────────────────────────────────────
+    // greyBuffer must be TYPE_INT_RGB (no alpha) so ColorConvertOp→CS_GRAY
+    // never leaves stray zero-alpha pixels that black-out the frame.
+    // We never cache a second Graphics2D on the offscreen — the caller passes
+    // its own og so there is only ever one Graphics2D writing to that surface.
     private BufferedImage greyBuffer;
     private final ColorConvertOp greyOp =
             new ColorConvertOp(java.awt.color.ColorSpace.getInstance(
@@ -52,8 +56,10 @@ public class BackgroundRenderer {
 
     public BackgroundRenderer(Random rng) {
         this.rng = rng;
-        // Scratch buffer for greyscale compositing
-        greyBuffer = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+        // TYPE_INT_RGB (no alpha channel) is critical: ColorConvertOp to CS_GRAY
+        // on a TYPE_INT_ARGB source zeroes out the alpha, causing black rectangles
+        // when the result is composited back. RGB avoids the problem entirely.
+        greyBuffer = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
     }
 
     // ── Initialisation ────────────────────────────────────────────────────────
@@ -172,23 +178,27 @@ public class BackgroundRenderer {
 
     /**
      * Post-process greyscale composite over the whole frame.
-     * Call this AFTER all other drawing (players, HUD) is done,
-     * passing the same offscreen BufferedImage so it can blend in-place.
+     * Call this AFTER all other drawing (players, HUD) is done.
      *
-     * @param offscreen the full offscreen frame buffer
+     * @param offscreen the full offscreen frame buffer (read source)
+     * @param og        the Graphics2D that owns the offscreen (used for the blend)
      * @param grey      0 = full colour, 1 = full greyscale
      */
-    public void applyGreyscale(BufferedImage offscreen, float grey) {
+    public void applyGreyscale(BufferedImage offscreen, Graphics2D og, float grey) {
         if (grey <= 0.005f) return;
+        // Clamp: AlphaComposite throws IllegalArgumentException if alpha > 1.0
+        float alpha = Math.min(grey, 1.0f);
 
-        // Convert to greyscale into scratch buffer
+        // Step 1: convert the current offscreen into the RGB grey scratch buffer
         greyOp.filter(offscreen, greyBuffer);
 
-        // Blend greyscale over original using grey as alpha
-        Graphics2D g = offscreen.createGraphics();
-        g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, grey));
-        g.drawImage(greyBuffer, 0, 0, null);
-        g.dispose();
+        // Step 2: composite the grey image back using the caller's Graphics2D.
+        // Using the same og that drew the frame is safe — we're in the game-loop
+        // thread and paintComponent only reads the finished offscreen afterwards.
+        Composite prev = og.getComposite();
+        og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        og.drawImage(greyBuffer, 0, 0, null);
+        og.setComposite(prev);   // always restore — don't leave a dirty composite
     }
 
     // ── Private draw helpers ──────────────────────────────────────────────────
@@ -265,6 +275,10 @@ public class BackgroundRenderer {
         int baseAlpha = (int)(30 + intensity * 80 + punch * 80);
         baseAlpha     = Math.min(baseAlpha, 180);
 
+        // Save composite before any tinted fills — dirty composite is the #1
+        // cause of black rectangles on players and HUD after this method returns.
+        Composite savedComposite = g.getComposite();
+
         g.setColor(new Color(200, 0, 0, baseAlpha));
         g.fillRect(0, 0, W, H);
 
@@ -277,6 +291,9 @@ public class BackgroundRenderer {
                 && clock.isBarBeat(2)) {
             drawStrobeLight(g, W / 2, -20, clock.beatPunch(0.3f), 1f);
         }
+
+        // Always restore — prevents composite leak into player/HUD drawing
+        g.setComposite(savedComposite);
     }
 
     private void drawStrobeLight(Graphics2D g, int cx, int cy, float pulse, float urgency) {

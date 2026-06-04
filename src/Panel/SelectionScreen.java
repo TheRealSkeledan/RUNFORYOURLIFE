@@ -230,7 +230,7 @@ Here I Come
         imgBG          = tryLoad(UI + "SelectionBG.png");
         previewNormal   = tryLoad(UI + "NormalMode.png");
         previewHardcore = tryLoad(UI + "HardcoreMode.png");
-        previewHotel    = tryLoad(UI + "HotelMode.png");
+        previewHotel    = null; // Hotel preview image removed
         titleNormal     = tryLoad(UI + "NormalTitle.png");
         titleHardcore   = tryLoad(UI + "HardcoreTitle.png");
         titleHotel      = tryLoad(UI + "HotelTitle.png");

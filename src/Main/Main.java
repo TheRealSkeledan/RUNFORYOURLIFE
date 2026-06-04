@@ -3,6 +3,7 @@ import Panel.GamePanel;
 import Panel.MenuPanel;
 import Panel.SelectionScreen;
 import Panel.AchievementsPanel;
+import Panel.SplashPanel;
 
 import javax.swing.*;
 import java.awt.*;
@@ -33,21 +34,16 @@ public class Main {
             frame.getContentPane().setBackground(Color.BLACK);
             frame.setLayout(new BorderLayout());
 
-            MenuPanel menuPanel;
-            try {
-                menuPanel = new MenuPanel(frame);
-            } catch (Exception e) {
-                e.printStackTrace();
-                return;
-            }
+            // Show logo splash first — no music until MenuPanel takes over
+            SplashPanel splash = new SplashPanel(frame);
 
-            frame.add(menuPanel, BorderLayout.CENTER);
+            frame.add(splash, BorderLayout.CENTER);
             frame.pack();
             frame.setMinimumSize(new Dimension(640, 360));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
 
-            menuPanel.requestFocusInWindow();
+            splash.requestFocusInWindow();
         });
     }
 

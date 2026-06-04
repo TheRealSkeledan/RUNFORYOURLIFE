@@ -34,7 +34,7 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     private static final int   H        = 720;
     private static final float GROUND_Y = 580f;
     // Target 120 FPS; the game loop thread uses precise nanosecond timing
-    private static final int   TARGET_FPS = 40;
+    private static final int   TARGET_FPS = 60;
     private static final long  TICK_NS    = 1_000_000_000L / TARGET_FPS;
     private static final float DT         = 1f / TARGET_FPS;
 
@@ -101,6 +101,8 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     private float   runnerKnockX  = RUNNER_X;   // runner's current X — only resets on new game
     private float   runnerDuckTimer  = 0f;
     private float   chaserDuckTimer  = 0f;
+    private boolean runnerDuckConsumed  = false;  // true after timer expires; requires key re-press
+    private boolean chaserDuckConsumed  = false;
     private static final float DUCK_MAX = 2.0f;
 
     // ── Chaser state ──────────────────────────────────────────────────────────
@@ -143,9 +145,17 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
     private final BeatClock          clock    = new BeatClock(160f);
     private final SongTimeline       timeline = new SongTimeline();
 
-    // ── Rendering ─────────────────────────────────────────────────────────────
-    private final BufferedImage offscreen;
-    private final Graphics2D    og;
+    // ── Rendering — ping-pong double buffer ───────────────────────────────────
+    // The game-loop thread always writes to backBuffer/og.
+    // When a frame is complete, frontBuffer is swapped atomically via a volatile
+    // reference so paintComponent (EDT) never reads a half-written frame.
+    private final BufferedImage bufferA;
+    private final BufferedImage bufferB;
+    private final Graphics2D    gA;
+    private final Graphics2D    gB;
+    private BufferedImage backBuffer;   // game-loop thread writes here
+    private Graphics2D    og;           // always points at backBuffer's G2D
+    private volatile BufferedImage frontBuffer;  // EDT reads this — volatile for visibility
 
     // ── Misc ──────────────────────────────────────────────────────────────────
     @SuppressWarnings("unused") private Music bgm;
@@ -169,13 +179,25 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         setFocusable(true);
         addKeyListener(input);
 
-        offscreen = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
-        og = offscreen.createGraphics();
-        // Use speed hints on the offscreen buffer for better frame rate
-        og.setRenderingHint(RenderingHints.KEY_ANTIALIASING,        RenderingHints.VALUE_ANTIALIAS_ON);
-        og.setRenderingHint(RenderingHints.KEY_RENDERING,           RenderingHints.VALUE_RENDER_SPEED);
-        og.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING,     RenderingHints.VALUE_COLOR_RENDER_SPEED);
-        og.setRenderingHint(RenderingHints.KEY_INTERPOLATION,       RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        // Guarantee achievements are saved even if the window is closed mid-game
+        // (i.e. before endGame() is ever called).
+        Runtime.getRuntime().addShutdownHook(new Thread(achievements::save, "AchievementSaveHook"));
+
+        // Allocate both ping-pong buffers with identical settings
+        bufferA = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+        bufferB = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+        gA = bufferA.createGraphics();
+        gB = bufferB.createGraphics();
+        for (Graphics2D g2 : new Graphics2D[]{ gA, gB }) {
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,    RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_RENDERING,       RenderingHints.VALUE_RENDER_SPEED);
+            g2.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_SPEED);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,   RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        }
+        // Start: game loop writes to bufferA, EDT reads bufferB (initially black)
+        backBuffer  = bufferA;
+        og          = gA;
+        frontBuffer = bufferB;
 
         bgr = new BackgroundRenderer(rng);
         bgr.init();
@@ -195,7 +217,13 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
                     handleInput();
                     if (state == State.PLAYING) update(DT);
                     render();
-                    repaint();
+                    // Atomic buffer swap: promote the just-finished back buffer to front.
+                    // paintComponent only ever reads frontBuffer (volatile), so it will
+                    // never see a partially-written frame regardless of EDT scheduling.
+                    frontBuffer = backBuffer;
+                    backBuffer  = (backBuffer == bufferA) ? bufferB : bufferA;
+                    og          = (backBuffer == bufferA) ? gA      : gB;
+                    SwingUtilities.invokeLater(this::repaint);
                     frames++;
                     long cur = System.currentTimeMillis();
                     if (cur - lastFpsTime >= 1000) {
@@ -247,11 +275,11 @@ private final AchievementSystem  achievements = new AchievementSystem(); // ← 
         obsSpeed = OBS_SPEED[di];
 
         runnerY = GROUND_Y; runnerVY = 0f; runnerGround = true;
-        runnerDuck = false; runnerStun = 0f; runnerInvince = 0f; runnerDuckTimer = 0f;
+        runnerDuck = false; runnerStun = 0f; runnerInvince = 0f; runnerDuckTimer = 0f; runnerDuckConsumed = false;
         runnerHits = 0; runnerKnockX = RUNNER_X;
 
         chaserX = CHASER_X; chaserY = GROUND_Y; chaserVY = 0f;
-        chaserGround = true; chaserDuck = false; chaserStun = 0f; chaserDuckTimer = 0f;
+        chaserGround = true; chaserDuck = false; chaserStun = 0f; chaserDuckTimer = 0f; chaserDuckConsumed = false;
         chaserThrowCooldown = 0f;
 
         obstacles.clear(); warnings.clear(); projectiles.clear();
@@ -347,8 +375,12 @@ if (timeLeft <= 0) {
                 achievements.onJump();
             }
             boolean wasDucking = runnerDuck;
-            // Duck only if: key held AND on ground AND timer not expired
-            if (input.runnerDuck && runnerGround) {
+            // Duck: pressing starts 2s timer; releasing key ends early; timer expiry requires new press
+            if (!input.runnerDuck) {
+                // Key released — reset consumed flag so next press works
+                runnerDuckConsumed = false;
+            }
+            if (input.runnerDuck && runnerGround && !runnerDuckConsumed) {
                 if (!wasDucking) {
                     runnerDuck = true;
                     runnerDuckTimer = DUCK_MAX;
@@ -358,9 +390,10 @@ if (timeLeft <= 0) {
                     if (runnerDuckTimer <= 0) {
                         runnerDuck = false;
                         runnerDuckTimer = 0f;
+                        runnerDuckConsumed = true;  // must release key before ducking again
                     }
                 }
-            } else {
+            } else if (!input.runnerDuck || !runnerGround) {
                 runnerDuck = false;
                 runnerDuckTimer = 0f;
             }
@@ -384,7 +417,10 @@ if (timeLeft <= 0) {
                 chaserDuck   = false;
             }
             boolean wasChaserDucking = chaserDuck;
-            if (input.chaserDuck && chaserGround) {
+            if (!input.chaserDuck) {
+                chaserDuckConsumed = false;
+            }
+            if (input.chaserDuck && chaserGround && !chaserDuckConsumed) {
                 if (!wasChaserDucking) {
                     chaserDuck = true;
                     chaserDuckTimer = DUCK_MAX;
@@ -393,9 +429,10 @@ if (timeLeft <= 0) {
                     if (chaserDuckTimer <= 0) {
                         chaserDuck = false;
                         chaserDuckTimer = 0f;
+                        chaserDuckConsumed = true;
                     }
                 }
-            } else {
+            } else if (!input.chaserDuck || !chaserGround) {
                 chaserDuck = false;
                 chaserDuckTimer = 0f;
             }
@@ -467,6 +504,7 @@ if (timeLeft <= 0) {
             if (p.x > W + 60) { pit.remove(); continue; }
             if (runnerInvince <= 0 && p.bounds().intersects(runnerHitBox())) {
                 pit.remove();
+                achievements.onProjectileHit();
                 hitRunner();
                 if (state == State.GAME_OVER) return;
             }
@@ -592,7 +630,7 @@ if (timeLeft <= 0) {
         if (state == State.GAME_OVER) hud.drawGameOverOverlay(og, runnerWon, diff, elapsed, timeLeft);
 
         // Greyscale post-process — fast int-array path, only active during grey sections
-        bgr.applyGreyscale(offscreen, timeline.grey);
+        bgr.applyGreyscale(backBuffer, og, timeline.grey);
     }
 
     private void drawWarnings() {
@@ -673,10 +711,22 @@ if (timeLeft <= 0) {
 
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
+        // Do NOT call super.paintComponent — that would clear the panel to black
+        // before we draw the offscreen image, causing a visible black flash.
+        // Read frontBuffer: the last fully-rendered frame, swapped atomically
+        // by the game loop after every render() call. The volatile write on the
+        // game thread and this volatile read on the EDT form a happens-before
+        // edge, so we are guaranteed to see a complete, non-torn frame.
+        BufferedImage frame = frontBuffer;
+        if (frame == null) return;
         int   pw    = getWidth(), ph = getHeight();
         float scale = Math.min((float)pw / W, (float)ph / H);
         int   dw    = Math.round(W * scale), dh = Math.round(H * scale);
-        g.drawImage(offscreen, (pw - dw) / 2, (ph - dh) / 2, dw, dh, null);
+        int   ox    = (pw - dw) / 2,        oy = (ph - dh) / 2;
+        // Fill letterbox bars (if any) with black — only the bars, not the game area
+        g.setColor(Color.BLACK);
+        if (ox > 0) { g.fillRect(0, 0, ox, ph); g.fillRect(ox + dw, 0, ox + 1, ph); }
+        if (oy > 0) { g.fillRect(0, 0, pw, oy); g.fillRect(0, oy + dh, pw, oy + 1); }
+        g.drawImage(frame, ox, oy, dw, dh, null);
     }
 }
