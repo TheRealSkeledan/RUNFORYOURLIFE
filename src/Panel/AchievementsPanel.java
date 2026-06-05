@@ -14,17 +14,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * AchievementsPanel — DOORS-style grid.
- *
- * • Square images, no clipping, no rounded corners
- * • Hover  → icon lifts up + name label appears below
- * • Click  → full-screen detail overlay: large image, title, description, tier
- * • Locked → greyscale + dark overlay + "?" centred
- */
 public class AchievementsPanel extends JPanel {
 
-    // ── Constants ─────────────────────────────────────────────────────────────
     private static final int W          = 1280;
     private static final int H          = 720;
     private static final int ICON_SIZE  = 88;       // base icon size

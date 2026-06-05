@@ -9,19 +9,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
-/**
- * SplashPanel — full-screen logo intro shown on startup before the menu.
- *
- * Sequence (all timings in seconds):
- *   0.00 – 0.00  Black screen, logo SFX fires immediately
- *   0.00 – 0.35  Logo scales from 0 → 1.08  (pop-in overshoot)
- *   0.35 – 0.55  Logo settles from 1.08 → 1.00  (snap back)
- *   0.55 – 2.00  Logo holds at full size
- *   2.00 – 2.80  Logo slides upward off screen
- *   2.80+        Hands off to MenuPanel (music starts there)
- *
- * No music is started here — music begins in MenuPanel as normal.
- */
 public class SplashPanel extends JPanel {
 
     // ── Logical resolution ────────────────────────────────────────────────────
